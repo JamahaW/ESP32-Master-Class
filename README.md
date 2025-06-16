@@ -112,7 +112,7 @@ if (xTaskCreate(blinkTask, "Blink", 2048, params, 1, nullptr) != pdPASS) {
 
 Внутри задачи:
 
-```c
+```cpp
 void blinkTask(void *p) {
     auto params = static_cast<TaskParams*>(p);
     // Используем params->pin и params->interval

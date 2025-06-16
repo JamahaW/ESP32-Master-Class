@@ -35,7 +35,7 @@ void setup() {
         new std::pair<int, int>(4, 1000),
         // Приоритет задачи = 0 (как у setup, loop)
         0,
-        // Куда вернуть handler задачи (null - не передаём)
+        // Handler задачи не возвращаем
         nullptr
     );
 
@@ -49,6 +49,7 @@ void setup() {
         stack_depth,
         new std::pair<int, int>(15, 1000 / 3),
         0,
+        // Передаём handler этой задачи в blink_2
         &blink_2
     );
 

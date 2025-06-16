@@ -1,3 +1,7 @@
+// Занятие: 3.5
+// Задача: 1
+// Задачи FreeRTOS
+
 #include <Arduino.h>
 
 
@@ -70,6 +74,9 @@ void blink(void *parameters) {
     // Код ниже будет недоступен, т.к. выполнение задачи будет прекращено сразу же
 }
 
+// Глобальные дескрипторы задач для управления ими в loop
+TaskHandle_t blink_1, blink_2;
+
 void setup() {
 
     // Создаём параметры для первой задачи
@@ -80,14 +87,69 @@ void setup() {
     };
 
     // Используем нашу функцию-помощник для создания и запуска задачи
-    taskCreateHelper("Blink-1", blink, &blink_1_parameters);
+    blink_1 = taskCreateHelper("Blink-1", blink, &blink_1_parameters);
 
     // аналогично и для второй задачи
 
     static BlinkParameters blink_2_parameters = {15, 1000 / 3, 15};
-    taskCreateHelper("Blink-2", blink, &blink_2_parameters);
+    blink_2 = taskCreateHelper("Blink-2", blink, &blink_2_parameters);
 }
 
-void loop() {
+// Вспомогательные функции интерпретатора
+void handleCommand(char command, TaskHandle_t task);
 
+TaskHandle_t getTask(char target);
+
+// Простой интерпретатор команд для управления задачами
+void loop() {
+    if (Serial.available()) { return; }
+
+    char command = char(Serial.read());
+
+    TaskHandle_t task = getTask(char(Serial.read()));
+
+    if (task != nullptr) {
+        handleCommand(command, task);
+    } else {
+        Serial.println("Неизвестная задача");
+    }
+}
+
+void handleCommand(char command, TaskHandle_t task) {
+    const char *name = pcTaskGetName(task);
+    if (name == nullptr) { name = "Безымянная"; }
+
+    Serial.printf("Задача: `%s` :", name);
+
+    switch (command) {
+        case 'p':
+            vTaskSuspend(task);
+            Serial.println("Приостановлена\n");
+            return;
+
+        case 'r':
+            vTaskResume(task);
+            Serial.println("Возобновлена\n");
+            return;
+
+        case 'g': {
+            eTaskState state = eTaskGetState(task);
+            Serial.printf("Статус: %d", int(state));
+        }
+            return;
+
+        default:
+            Serial.println("Неизвестная команда");
+    }
+}
+
+TaskHandle_t getTask(char target) {
+    switch (target) {
+        case '1':
+            return blink_1;
+        case '2':
+            return blink_2;
+        default:
+            return nullptr;
+    }
 }

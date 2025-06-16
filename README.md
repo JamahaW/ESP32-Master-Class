@@ -136,7 +136,7 @@ void blinkTask(void *p) {
 
 ### 6. Жизненный цикл задачи
 
-```stateDiagram-v2
+```Mermaid
 [*] --> Ready
 Ready --> Running : Scheduler selects
 Running --> Ready : Time slice expired

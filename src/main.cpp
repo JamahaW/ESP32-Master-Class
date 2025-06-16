@@ -93,6 +93,11 @@ void setup() {
 
     static BlinkParameters blink_2_parameters = {15, 1000 / 3, 15};
     blink_2 = taskCreateHelper("Blink-2", blink, &blink_2_parameters);
+
+    // Запуск последовательного порта (далее - ожидание и обработка команд в loop)
+
+    Serial.begin(115200);
+    Serial.println("Старт!");
 }
 
 // Вспомогательные функции интерпретатора

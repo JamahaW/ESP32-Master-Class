@@ -137,14 +137,14 @@ void blinkTask(void *p) {
 ### 6. Жизненный цикл задачи
 
 ```mermaid
-graph TD;
+stateDiagram-v2
 [*] --> Ready
-Ready --> Running : Scheduler selects
-Running --> Ready : Time slice expired
-Running --> Blocked : Waiting for event
-Blocked --> Ready : Event occurred
-Running --> Suspended : vTaskSuspend()
-Suspended --> Ready : vTaskResume()
+Ready --> Running: Scheduler selects
+Running --> Ready: Time slice expired
+Running --> Blocked: Waiting for event
+Blocked --> Ready: Event occurred
+Running --> Suspended: vTaskSuspend()
+Suspended --> Ready: vTaskResume()
 ```
 
 ### 7. Приоритеты задач

@@ -31,13 +31,25 @@ void oledUpdate(void *) {
     oled.init();
     oled.setScale(2);
 
+    // Предыдущее значение питания
+    bool oled_last_enabled = oled_enabled;
+
     while (true) {
+
+        // Если значение изменилось с прошлого раза, то обновляем и запоминаем
+        if (oled_enabled != oled_last_enabled) {
+            oled_last_enabled = oled_enabled;
+            oled.setPower(oled_enabled);
+        }
+
+        // Обновляем дисплей, если он включен
         if (oled_enabled) {
             oled.clear();
             oled.setCursor(0, 0);
             oled.printf("Pot:%d", pot);
             oled.update();
         }
+
         delay(100);
     }
 }

@@ -1,41 +1,30 @@
 /*
  * Занятие 2.
- * Задача 3 - Управление яркостью светодиода с помощью ШИМ через analogWrite
+ * Задача 4 - analogRead
  */
 
 #include <Arduino.h>
 
 
-const int pin_led = 26;
+const int pin_led = 26, pin_potentiometer = 33;
 
-const int pwm_resolution_bits = 10;
+const auto adc_resolution = 8; // Разрешение АЦП (1..16)
 
 void setup() {
     pinMode(pin_led, OUTPUT);
 
-    // Меняем частоту ШИМ
-    analogWriteFrequency(10000); // 10КГц
-    // Изменяем разрешение ШИМ
-    analogWriteResolution(pwm_resolution_bits);
+    // Изменить разрешение АЦП
+    analogReadResolution(adc_resolution);
 
     Serial.begin(115200);
     Serial.println("Старт!");
 }
 
 void loop() {
-    // Амплитуда
-    const int max_pwm = (1 << pwm_resolution_bits) - 1; // 2 ** pwm_resolution_bits - 1
+    int value = analogRead(pin_potentiometer);
+    analogWrite(pin_led, value);
 
-    // Длительность шага
-    const int step_ms = 1000 / max_pwm;
+    Serial.printf("ADC: %d\n", value);
 
-    for (int i = -max_pwm; i < max_pwm; i++) {
-        // Вычисляем уровень заполнения шим по треугольной функции: /\/\/\/\/
-        int pwm = max_pwm - abs(i);
-
-        analogWrite(pin_led, pwm);
-
-        Serial.printf("PWM: %d\n", pwm);
-        delay(step_ms);
-    }
+    delay(1000);
 }

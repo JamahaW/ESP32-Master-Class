@@ -20,7 +20,7 @@ void loop() {
     const int max_pwm = 255;
 
     for (int i = -max_pwm; i <= max_pwm; i++) {
-        // Вычисляем шим по треугольной функции
+        // Вычисляем уровень заполнения шим по треугольной функции: /\/\/\/\/
         int pwm = max_pwm - abs(i);
 
         analogWrite(pin_led, pwm);

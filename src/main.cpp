@@ -1,6 +1,6 @@
 /*
  * Занятие 3
- * Задание 2.2 - Задача мигания светодиода и рефакторинг
+ * Задание 2.3 - Изменение периода мигания светодиода с помощью потенциометра
  */
 
 #include <Arduino.h>
@@ -43,10 +43,13 @@ void blink(void *) {
     pinMode(pin, OUTPUT);
 
     while (true) {
+        // Вычисляем полупериод пропорционально значению потенциометра
+        int half_period = map(pot, 0, 4095, 50, 500);
+
         digitalWrite(pin, HIGH);
-        delay(500);
+        delay(half_period);
         digitalWrite(pin, LOW);
-        delay(500);
+        delay(half_period);
     }
 }
 

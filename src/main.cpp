@@ -1,160 +1,96 @@
-// Занятие: 3.5
-// Задача: 1
-// Задачи FreeRTOS
-
 #include <Arduino.h>
 
+#include <GyverOLED.h>
 
-// Реализуем Функцию-помощник так как требуется создавать однотипные примитивные задачи
-TaskHandle_t taskCreateHelper(const char *task_name, TaskFunction_t code, void *parameters) {
-    // Размер стека для задач избыточен
-    const int stack_depth = 4096;
-    // Обычный приоритет для пользовательских задач
-    const int default_task_priority = 0;
 
-    // Возвращаемый дескриптор задачи (До попытки создания задачи предполагаем, что не удалось)
-    TaskHandle_t ret = nullptr;
+GyverOLED<SSD1306_128x64, OLED_BUFFER> oled;
 
-    // Пытаемся создать задачу
-    BaseType_t result = xTaskCreate(
-        // Передаём указатель на функцию, чтобы указать участок кода для выполнения задачей
-        code,
-        // Передаём наименование задачи для удобства отладки во время выполнения
-        task_name,
-        // Указываем размер стека для задачи
-        stack_depth,
-        // Передаём параметры для этой задачи
-        parameters,
-        // Указываем приоритет задачи
-        default_task_priority,
-        // Получаем дескриптор задачи
-        &ret
-    );
-    // После создания задачи её выполнение начнётся сразу
+// Глобальная переменная, хранит последнее значение потенциометра
+volatile int pot = 0;
 
-    // Результатом может быть pdPASS (= 1) или pdFAIL (= 0)
-    if (result == pdPASS) {
-        Serial.printf("Успешно создана и запущена задача: %s\n", task_name);
-    } else {
-        Serial.printf("Не удалось создать задачу: %s\n", task_name);
+// Флаг управления дисплеем
+volatile bool is_oled_on = true;
+
+
+// Задача потенциометра
+void potUpdate(void *) {
+    const int pin_pot = 4;
+    pinMode(pin_pot, INPUT);
+
+    while (true) {
+        pot = analogRead(pin_pot);
+        delay(10);
     }
-
-    // Если xTaskCreate возвращает pdPASS, то ret будет установлен в действительный дескриптор задачи.
-    // Если xTaskCreate возвращает pdFAIL, то ret останется `nullptr`.
-
-    return ret;
 }
 
-// Определим параметры для задачи
-struct BlinkParameters {
-    const int pin, period, iterations;
-};
+// Задача дисплея
+void oledUpdate(void *) {
+    oled.init();
+    oled.setScale(2);
 
-// Задача для мигания
-void blink(void *parameters) {
-    auto *p = static_cast<BlinkParameters *>(parameters);
+    bool current_power_state = true;
 
-    // Получаем имя этой задачи
-    const char *name = pcTaskGetName(nullptr);
+    while (true) {
+        // Проверяем, нужно ли изменить состояние питания
+        if (is_oled_on != current_power_state) {
+            oled.setPower(is_oled_on);
+            current_power_state = is_oled_on;
+        }
 
-    pinMode(p->pin, OUTPUT);
+        // Если питание включено и обновление разрешено, обновляем дисплей
+        if (is_oled_on) {
+            oled.clear();
+            oled.setCursor(0, 0);
+            oled.printf("Pot:%d", pot);
+            oled.update();
+        }
 
-    for (int i = 0; i < p->iterations; i++) {
-        Serial.printf("Мигаем из задачи %s\n", name);
-
-        digitalWrite(p->pin, HIGH);
-        delay(p->period);
-        digitalWrite(p->pin, LOW);
-        vTaskDelay(p->period / portTICK_PERIOD_MS); // ровно то же самое, что и delay
+        delay(100); // 10 Гц
     }
-
-    // Удаляем ЭТУ задачу (nullptr сообщает об использовании контекста)
-    vTaskDelete(nullptr);
-
-    // Код ниже будет недоступен, т.к. выполнение задачи будет прекращено сразу же
 }
 
-// Глобальные дескрипторы задач для управления ими в loop
-TaskHandle_t blink_1, blink_2;
+// Задача мигания светодиодом
+void blink(void *) {
+    const int pin = 13;
+    pinMode(pin, OUTPUT);
+
+    while (true) {
+        // Вычисляем полупериод
+        int half_period = map(pot, 0, 4095, 50, 500);
+
+        digitalWrite(pin, LOW);
+        delay(half_period);
+        digitalWrite(pin, HIGH);
+        delay(half_period);
+    }
+}
+
+// Обработчик прерывания кнопки
+void IRAM_ATTR onClick() {
+    const auto debounce = 200; // длительность дребезга контактов мс
+    static auto last_click = millis(); // момент предыдущего вызова обработчика
+
+    // Антидребезг
+    if (millis() - last_click < debounce) { return; }
+    last_click = millis();
+
+    // Инвертируем состояние дисплея
+    is_oled_on = !is_oled_on;
+    Serial.printf("Click: %s\n", is_oled_on ? "On" : "Off");
+}
 
 void setup() {
-
-    // Создаём параметры для первой задачи
-    static BlinkParameters blink_1_parameters = {
-        .pin = 4,
-        .period = 1000,
-        .iterations = 5
-    };
-
-    // Используем нашу функцию-помощник для создания и запуска задачи
-    blink_1 = taskCreateHelper("Blink-1", blink, &blink_1_parameters);
-
-    // аналогично и для второй задачи
-
-    static BlinkParameters blink_2_parameters = {15, 1000 / 3, 15};
-    blink_2 = taskCreateHelper("Blink-2", blink, &blink_2_parameters);
-
-    // Запуск последовательного порта (далее - ожидание и обработка команд в loop)
-
     Serial.begin(115200);
-    Serial.println("Старт!");
+
+    // Создаем задачи
+    xTaskCreate(potUpdate, "PotUpdate", 2048, nullptr, 1, nullptr);
+    xTaskCreate(oledUpdate, "OledUpdate", 2048, nullptr, 1, nullptr);
+    xTaskCreate(blink, "Blink", 2048, nullptr, 1, nullptr);
+
+    // Настройка кнопки
+    const int pin_button = 14;
+    pinMode(pin_button, INPUT_PULLDOWN);
+    attachInterrupt(pin_button, onClick, RISING);
 }
 
-// Вспомогательные функции интерпретатора
-void handleCommand(char command, TaskHandle_t task);
-
-TaskHandle_t getTask(char target);
-
-// Простой интерпретатор команд для управления задачами
-void loop() {
-    if (Serial.available()) { return; }
-
-    char command = char(Serial.read());
-
-    TaskHandle_t task = getTask(char(Serial.read()));
-
-    if (task != nullptr) {
-        handleCommand(command, task);
-    } else {
-        Serial.println("Неизвестная задача");
-    }
-}
-
-void handleCommand(char command, TaskHandle_t task) {
-    const char *name = pcTaskGetName(task);
-    if (name == nullptr) { name = "Безымянная"; }
-
-    Serial.printf("Задача: `%s` :", name);
-
-    switch (command) {
-        case 'p':
-            vTaskSuspend(task);
-            Serial.println("Приостановлена\n");
-            return;
-
-        case 'r':
-            vTaskResume(task);
-            Serial.println("Возобновлена\n");
-            return;
-
-        case 'g': {
-            eTaskState state = eTaskGetState(task);
-            Serial.printf("Статус: %d", int(state));
-        }
-            return;
-
-        default:
-            Serial.println("Неизвестная команда");
-    }
-}
-
-TaskHandle_t getTask(char target) {
-    switch (target) {
-        case '1':
-            return blink_1;
-        case '2':
-            return blink_2;
-        default:
-            return nullptr;
-    }
-}
+void loop() {}

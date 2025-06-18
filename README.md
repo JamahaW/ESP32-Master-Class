@@ -108,7 +108,7 @@ struct TaskParams {
 static TaskParams params = { 13, 500 };
 
 // Передача в задачу
-xTaskCreate(blinkTask, "Blink", 2048, &params, 1, nullptr);
+xTaskCreate(blinkTask, "blink", 2048, &params, 1, nullptr);
 ```
 
 - Если ресурсы для задачи рациональнее хранить вместе с задачей, то следует использовать heap
@@ -117,7 +117,7 @@ xTaskCreate(blinkTask, "Blink", 2048, &params, 1, nullptr);
 auto params = new TaskParams{ 13, 500 };
 
 // попытка создать задачу
-if (xTaskCreate(blinkTask, "Blink", 2048, params, 1, nullptr) != pdPASS) {
+if (xTaskCreate(blinkTask, "blink", 2048, params, 1, nullptr) != pdPASS) {
     // Если не удалось создать задачу - освобождаем память для от параметров
     delete params;
 } 

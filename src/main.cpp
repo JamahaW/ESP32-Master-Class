@@ -3,21 +3,26 @@
 #include <WiFi.h>
 
 
-struct Message : Printable {
-    char text[32]{};
-    int32_t counter{};
+#pragma pack(push, 1)  // Гарантированное выравнивание без паддинга
 
-    size_t printTo(Print &p) const override {
-        return p.printf("Message{.text=\"%s\", .counter=%d}", text, counter);
+struct Message {
+    char text[32];
+    int32_t counter;
+
+    void print() const {
+        Serial.printf("Message{.text=\"%s\", .counter=%d}", text, counter);
     }
 };
 
+#pragma pack(pop)
+
 using u8 = uint8_t;
 
-void printMac(const u8 *mac) {
-    Serial.write('[');
-    for (int i = 0; i < 6; i++) { Serial.printf("%02X:", mac[i]); }
-    Serial.write(']');
+void printMac(const uint8_t *mac) {
+    Serial.printf(
+        "[%02X:%02X:%02X:%02X:%02X:%02X]",
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+    );
 }
 
 void onDataReceive(const u8 *mac, const u8 *data, int size) {
@@ -26,8 +31,8 @@ void onDataReceive(const u8 *mac, const u8 *data, int size) {
     if (size != sizeof(Message)) {
         Serial.println(" (Неопределенный формат)");
         for (int i = 0; i < size; i += 1) {
-            Serial.printf("%02X", data[i]);
-            if (i % 6 == 0) { Serial.println(); }
+            Serial.printf("%02X ", data[i]);
+            if (i % 6 == 1) { Serial.println(); }
         }
         Serial.println();
 
@@ -35,8 +40,8 @@ void onDataReceive(const u8 *mac, const u8 *data, int size) {
     }
 
     const auto &msg = *reinterpret_cast<const Message *>(data);
-
-    Serial.println(msg);
+    msg.print();
+    Serial.println();
 }
 
 void setup() {

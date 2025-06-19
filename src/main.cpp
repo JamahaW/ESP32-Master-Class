@@ -5,7 +5,8 @@
 
 
 // Целевой MAC адрес
-constexpr std::array<uint8_t, 6> target_mac = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+constexpr std::array<uint8_t, 6> target_mac = {0x00, 0x4B, 0x12, 0x38, 0x8D, 0x00};
+//constexpr std::array<uint8_t, 6> target_mac = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30};
 
 // Структура пакета
 struct __attribute__((packed)) Packet {

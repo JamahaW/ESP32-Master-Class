@@ -44,12 +44,12 @@ void setup() {
     WiFi.mode(WIFI_STA);
 
     if (esp_now_init() != ESP_OK) {
-        Serial.println("ESP-NOW init failed");
+        Serial.println("Не удалось инициализировать ESP-NOW");
         return;
     }
 
     esp_now_register_recv_cb(onDataReceive);
-    Serial.println("Receiver ready. Waiting for messages...");
+    Serial.println("Start!");
 }
 
 void loop() {}

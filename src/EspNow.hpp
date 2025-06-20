@@ -26,12 +26,19 @@ struct EspNow {
 
     /// Статус доставки
     enum class DeliveryStatus {
-        Ok, /// Пакет дошел до получателя
-        Fail, /// Не удалось доставить пакет
+        /// Пакет дошел до получателя
+        Ok,
+        /// Не удалось доставить пакет
+        Fail,
     };
 
     using OnDeliveryFunction = std::function<void(const Mac &, DeliveryStatus)>;
     using OnReceiveFunction = std::function<void(const Mac &, const void *, int)>;
+
+    /// Обработчик доставки сообщения
+    OnDeliveryFunction _on_delivery;
+    /// Обработчик получения сообщения
+    OnReceiveFunction _on_receive;
 
     /// Получить экземпляр протокола для настройки
     static EspNow &instance() {
@@ -42,16 +49,14 @@ struct EspNow {
         return instance;
     }
 
-    /// Обработчик доставки сообщения
-    OnDeliveryFunction _on_delivery;
-    /// Обработчик получения сообщения
-    OnReceiveFunction _on_receive;
-
     /// Результат инициализации
     enum class InitResult {
-        Ok, /// Инициализация прошла успешно
-        InternalError, /// Внутренняя ошибка ESP-NOW API
-        UnknownError, /// Неизвестная ошибка ESP API
+        /// Инициализация прошла успешно
+        Ok,
+        /// Внутренняя ошибка ESP-NOW API
+        InternalError,
+        /// Неизвестная ошибка ESP API
+        UnknownError,
     };
 
     /// Инициализировать протокол ESP-NOW
@@ -60,10 +65,14 @@ struct EspNow {
     }
 
     enum class SetHandlerResult {
-        Ok, /// Обработчик успешно подключен
-        NotInit, /// Протокол ESP-NOW не был инициализирован
-        InternalError, /// Внутренняя ошибка ESP-NOW API
-        UnknownError, /// Неизвестная ошибка ESP API
+        /// Обработчик успешно подключен
+        Ok,
+        /// Протокол ESP-NOW не был инициализирован
+        NotInit,
+        /// Внутренняя ошибка ESP-NOW API
+        InternalError,
+        /// Неизвестная ошибка ESP API
+        UnknownError,
     };
 
     /// Установить обработчик входящих сообщений
@@ -102,13 +111,20 @@ struct EspNow {
 
     /// Результат добавления пира
     enum class AddPeerResult {
-        Ok, /// Пир успешно добавлен
-        NotInit, /// Протокол ESP-NOW не был инициализирован
-        InvalidArg, /// Неверный аргумент
-        Full, /// Список пиров полон
-        NoMemory, /// Не хватает памяти для добавления пира
-        Exists, /// Пир уже добавлен
-        UnknownError, /// Неизвестная ошибка ESP API
+        /// Пир успешно добавлен
+        Ok,
+        /// Протокол ESP-NOW не был инициализирован
+        NotInit,
+        /// Неверный аргумент
+        InvalidArg,
+        /// Список пиров полон
+        Full,
+        /// Не хватает памяти для добавления пира
+        NoMemory,
+        /// Пир уже добавлен
+        Exists,
+        /// Неизвестная ошибка ESP API
+        UnknownError,
     };
 
     /// Добавить пир
@@ -121,11 +137,16 @@ struct EspNow {
 
     /// Удалить пир
     enum class DeletePeerResult {
-        Ok, /// Пир успешно удален
-        NotInit, /// Протокол ESP-NOW не был инициализирован
-        InvalidArg,/// Неверный аргумент
-        NotFound, /// Пир не найден в списке добавленных
-        UnknownError, /// Неизвестная ошибка ESP API
+        /// Пир успешно удален
+        Ok,
+        /// Протокол ESP-NOW не был инициализирован
+        NotInit,
+        /// Неверный аргумент
+        InvalidArg,
+        /// Пир не найден в списке добавленных
+        NotFound,
+        /// Неизвестная ошибка ESP API
+        UnknownError,
     };
 
     /// Удалить пир
@@ -140,14 +161,22 @@ struct EspNow {
 
     /// Результат отправки сообщения
     enum class SendResult {
-        Ok, /// Сообщение успешно отправлено
-        NotInit, /// Протокол ESP-NOW не был инициализирован
-        InvalidArg,/// Неверный аргумент
-        InternalError, /// Внутренняя ошибка ESP-NOW API
-        NoMemory, /// Не хватает памяти для отправки сообщения
-        PeerNotFound, /// Целевой пир не найден
-        IncorrectWiFiMode, /// Установлен неверный режим интерфейса WiFi
-        UnknownError,/// Неизвестная ошибка ESP API
+        /// Сообщение успешно отправлено
+        Ok,
+        /// Протокол ESP-NOW не был инициализирован
+        NotInit,
+        /// Неверный аргумент
+        InvalidArg,
+        /// Внутренняя ошибка ESP-NOW API
+        InternalError,
+        /// Не хватает памяти для отправки сообщения
+        NoMemory,
+        /// Целевой пир не найден
+        PeerNotFound,
+        /// Установлен неверный режим интерфейса WiFi
+        IncorrectWiFiMode,
+        /// Неизвестная ошибка ESP API
+        UnknownError,
     };
 
     /// Отправить сообщение
@@ -181,6 +210,10 @@ private:
     inline static const Mac &castMac(const u8 *mac) {
         return *reinterpret_cast<const Mac *>(mac);
     }
+
+private:
+
+    // translate from esp
 
     static DeliveryStatus translateDeliveryStatus(esp_now_send_status_t status) {
         return (status == ESP_NOW_SEND_SUCCESS) ? DeliveryStatus::Ok : DeliveryStatus::Fail;
@@ -273,6 +306,16 @@ public:
 
     EspNow &operator=(const EspNow &) = delete;
 
+public:
+
+    // toString
+
+    static MacString toString(const Mac &mac) {
+        MacString buff;
+        sprintf(buff.data(), mac_format_string, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        return buff;
+    }
+
     static str toString(SetHandlerResult result) {
         switch (result) {
             return_case(SetHandlerResult::Ok)
@@ -336,11 +379,5 @@ public:
             return_case(SendResult::UnknownError)
             return_default()
         }
-    }
-
-    static MacString toString(const Mac &mac) {
-        MacString buff;
-        sprintf(buff.data(), mac_format_string, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        return buff;
     }
 };

@@ -30,7 +30,7 @@ void onReceive(const EspNow::Mac &mac, const void *data, int size) {
 }
 
 // Обработчик на отправку данных
-void onSend(const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
+void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
     printf("(onDelivery) [%s]: %s\n", EspNow::toString(mac).data(), EspNow::toString(status));
 }
 
@@ -41,17 +41,16 @@ void setup() {
 
     WiFiClass::mode(WIFI_STA);
 
-    auto &e = EspNow::instance();
-
-    e._on_receive = onReceive;
-    e._on_delivery = onSend;
-
     while (true) {
-        auto result = e.init();
+        auto result = EspNow::init();
         if (result == EspNow::InitResult::Ok) { break; }
         Serial.printf("Error: %s\n", EspNow::toString(result));
         delay(500);
     }
+
+    auto &e = EspNow::instance();
+    e.setDeliveryHandler(onDelivery);
+    e.setReceiveHandler(onReceive);
 
     auto self_mac = EspNow::mac();
     Serial.printf("Self: [%s]\n", EspNow::toString(self_mac).data());

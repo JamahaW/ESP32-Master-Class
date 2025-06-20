@@ -15,7 +15,7 @@
 #define return_case(__v) case __v: return #__v;
 #define return_default() default: return "Invalid";
 
-static constexpr char mac_format_string[] = "%02X:%02X:%02X:%02X:%02X:%02X";
+static constexpr char mac_format_string[] = "[%02X:%02X:%02X:%02X:%02X:%02X]";
 
 /// Обёртка над ESP-NOW API с использованием С++
 struct EspNow {
@@ -39,6 +39,8 @@ struct EspNow {
     using OnDeliveryFunction = std::function<void(const Mac &, DeliveryStatus)>;
     using OnReceiveFunction = std::function<void(const Mac &, const void *, int)>;
 
+    /// Мак адрес этого устройства
+    Mac mac;
     /// Обработчик доставки сообщения
     OnDeliveryFunction _on_delivery;
     /// Обработчик получения сообщения
@@ -47,6 +49,7 @@ struct EspNow {
     /// Получить экземпляр протокола для настройки
     static EspNow &instance() {
         static EspNow instance = {
+            .mac = getSelfMac(),
             ._on_delivery = nullptr,
             ._on_receive = nullptr
         };
@@ -112,13 +115,6 @@ struct EspNow {
 
     /// Завершить работу протокола
     static void quit() { esp_now_deinit(); }
-
-    /// Получить свой MAC адрес
-    static Mac mac() {
-        Mac ret = {};
-        esp_read_mac(ret.data(), ESP_MAC_WIFI_STA);
-        return ret;
-    }
 
     /// Результат добавления пира
     enum class PeerAdd {
@@ -227,6 +223,13 @@ private:
 
     inline static const Mac &castMac(const u8 *mac) {
         return *reinterpret_cast<const Mac *>(mac);
+    }
+
+    /// Получить свой MAC адрес
+    static Mac getSelfMac() {
+        Mac ret = {};
+        esp_read_mac(ret.data(), ESP_MAC_WIFI_STA);
+        return ret;
     }
 
 private:

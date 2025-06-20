@@ -8,8 +8,18 @@ struct __attribute__((packed)) Packet {
     uint32_t timestamp;
 };
 
+/// Широковещательный адрес
+//static constexpr EspNow::Mac target = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static constexpr EspNow::Mac target = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
+//static constexpr EspNow::Mac target = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30};
+
 // Обработчик приёма данных
 void onReceive(const EspNow::Mac &mac, const void *data, int size) {
+    Serial.printf(
+        "Received %d bytes from %s\n",
+        size,
+        EspNow::toString(mac).data()
+    );
 }
 
 // Обработчик на отправку данных
@@ -23,22 +33,30 @@ void setup() {
     // Инициализация
     {
         WiFiClass::mode(WIFI_STA);
+
         auto result = EspNow::init();
-        if (result.fail()) { Serial.printf("error: %s\n", EspNow::toString(result)); }
+        Serial.printf("init: %s\n", EspNow::toString(result));
 
         auto &e = EspNow::instance();
-        e.setDeliveryHandler(onDelivery);
-        e.setReceiveHandler(onReceive);
+        Serial.println(EspNow::toString(e.setDeliveryHandler(onDelivery)));
+        Serial.println(EspNow::toString(e.setReceiveHandler(onReceive)));
     }
 
     Serial.printf("Self: [%s]\n", EspNow::toString(EspNow::mac()).data());
 
-    // Отправка широковещательного
     {
-        Packet packet = {.timestamp = millis()};
-        auto result = EspNow::send(EspNow::broadcast, packet);
-        Serial.println(EspNow::toString(result));
+        auto result = EspNow::addPeer(target);
+        Serial.printf("add peer: %s\n", EspNow::toString(result));
     }
 }
 
-void loop() {}
+void loop() {
+    Packet packet = {
+        .timestamp = millis()
+    };
+
+    auto result = EspNow::send(target, packet);
+    Serial.println(EspNow::toString(result));
+
+    delay(1000);
+}

@@ -3,10 +3,11 @@
 #include <cstdint>
 #include <array>
 #include <functional>
+#include <cstring>
 #include <esp_err.h>
 #include <esp_now.h>
-#include <cstring>
 #include <esp_mac.h>
+#include <esp_wifi.h>
 
 #include "Result.hpp"
 
@@ -14,10 +15,10 @@
 #define return_case(__v) case __v: return #__v;
 #define return_default() default: return "Invalid";
 
+static constexpr char mac_format_string[] = "%02X:%02X:%02X:%02X:%02X:%02X";
 
 /// Обёртка над ESP-NOW API с использованием С++
 struct EspNow {
-    static constexpr char mac_format_string[] = "%02X:%02X:%02X:%02X:%02X:%02X";
     using MacString = std::array<char, sizeof(mac_format_string)>;
 
     using u8 = uint8_t;
@@ -25,8 +26,7 @@ struct EspNow {
 
     /// Безопасный тип для MAC адреса
     using Mac = std::array<u8, ESP_NOW_ETH_ALEN>;
-    /// Широковещательный адрес
-    static constexpr Mac broadcast = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
 
     /// Статус доставки
     enum class DeliveryStatus {
@@ -50,6 +50,7 @@ struct EspNow {
             ._on_delivery = nullptr,
             ._on_receive = nullptr
         };
+
         return instance;
     }
 
@@ -81,30 +82,32 @@ struct EspNow {
 
     /// Установить обработчик входящих сообщений
     Result<SetHandler> setReceiveHandler(OnReceiveFunction &&handler) {
-        _on_receive = handler;
+        _on_receive = std::move(handler);
 
-        return {
-            translateSetHandler(
-                (
-                    (handler == nullptr) ?
-                    esp_now_register_recv_cb(onReceive) : esp_now_unregister_recv_cb()
-                )
-            )
-        };
+        esp_err_t result;
+
+        if (_on_receive == nullptr) {
+            result = esp_now_unregister_recv_cb();
+        } else {
+            result = esp_now_register_recv_cb(onReceive);
+        }
+
+        return {translateSetHandler(result)};
     }
 
     /// Установить обработчик при доставке сообщений
     Result<SetHandler> setDeliveryHandler(OnDeliveryFunction &&handler) {
-        _on_delivery = handler;
+        _on_delivery = std::move(handler);
 
-        return {
-            translateSetHandler(
-                (
-                    (handler == nullptr) ?
-                    esp_now_register_send_cb(onDelivery) : esp_now_unregister_send_cb()
-                )
-            )
-        };
+        esp_err_t result;
+
+        if (_on_delivery == nullptr) {
+            result = esp_now_unregister_send_cb();
+        } else {
+            result = esp_now_register_send_cb(onDelivery);
+        }
+
+        return {translateSetHandler(result)};
     }
 
     /// Завершить работу протокола
@@ -137,8 +140,13 @@ struct EspNow {
 
     /// Добавить пир
     static Result<PeerAdd> addPeer(const Mac &mac) {
-        esp_now_peer_info_t peer = {};
-        memcpy(peer.peer_addr, mac.data(), 6);
+        esp_now_peer_info_t peer = {
+            .channel = 0,
+            .ifidx = WIFI_IF_STA,
+            .encrypt = false,
+        };
+
+        std::copy(mac.begin(), mac.end(), peer.peer_addr);
 
         return {translatePeerAdd(esp_now_add_peer(&peer))};
     }

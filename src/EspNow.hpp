@@ -8,6 +8,8 @@
 #include <cstring>
 #include <esp_mac.h>
 
+#include "Result.hpp"
+
 
 #define return_case(__v) case __v: return #__v;
 #define return_default() default: return "Invalid";
@@ -23,6 +25,8 @@ struct EspNow {
 
     /// Безопасный тип для MAC адреса
     using Mac = std::array<u8, ESP_NOW_ETH_ALEN>;
+    /// Широковещательный адрес
+    static constexpr Mac broadcast = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
     /// Статус доставки
     enum class DeliveryStatus {
@@ -50,7 +54,7 @@ struct EspNow {
     }
 
     /// Результат инициализации
-    enum class InitResult {
+    enum class Init {
         /// Инициализация прошла успешно
         Ok,
         /// Внутренняя ошибка ESP-NOW API
@@ -60,11 +64,11 @@ struct EspNow {
     };
 
     /// Инициализировать протокол ESP-NOW
-    static InitResult init() {
-        return translateInitResult(esp_now_init());
+    static Result<Init> init() {
+        return {translateInit(esp_now_init())};
     }
 
-    enum class SetHandlerResult {
+    enum class SetHandler {
         /// Обработчик успешно подключен
         Ok,
         /// Протокол ESP-NOW не был инициализирован
@@ -76,27 +80,31 @@ struct EspNow {
     };
 
     /// Установить обработчик входящих сообщений
-    SetHandlerResult setReceiveHandler(OnReceiveFunction &&handler) {
+    Result<SetHandler> setReceiveHandler(OnReceiveFunction &&handler) {
         _on_receive = handler;
 
-        return translateSetHandler(
-            (
-                (handler == nullptr) ?
-                esp_now_register_recv_cb(onReceive) : esp_now_unregister_recv_cb()
+        return {
+            translateSetHandler(
+                (
+                    (handler == nullptr) ?
+                    esp_now_register_recv_cb(onReceive) : esp_now_unregister_recv_cb()
+                )
             )
-        );
+        };
     }
 
     /// Установить обработчик при доставке сообщений
-    SetHandlerResult setDeliveryHandler(OnDeliveryFunction &&handler) {
+    Result<SetHandler> setDeliveryHandler(OnDeliveryFunction &&handler) {
         _on_delivery = handler;
 
-        return translateSetHandler(
-            (
-                (handler == nullptr) ?
-                esp_now_register_send_cb(onDelivery) : esp_now_unregister_send_cb()
+        return {
+            translateSetHandler(
+                (
+                    (handler == nullptr) ?
+                    esp_now_register_send_cb(onDelivery) : esp_now_unregister_send_cb()
+                )
             )
-        );
+        };
     }
 
     /// Завершить работу протокола
@@ -110,7 +118,7 @@ struct EspNow {
     }
 
     /// Результат добавления пира
-    enum class AddPeerResult {
+    enum class PeerAdd {
         /// Пир успешно добавлен
         Ok,
         /// Протокол ESP-NOW не был инициализирован
@@ -128,15 +136,15 @@ struct EspNow {
     };
 
     /// Добавить пир
-    static AddPeerResult addPeer(const Mac &mac) {
+    static Result<PeerAdd> addPeer(const Mac &mac) {
         esp_now_peer_info_t peer = {};
         memcpy(peer.peer_addr, mac.data(), 6);
 
-        return translateAddPeerResult(esp_now_add_peer(&peer));
+        return {translatePeerAdd(esp_now_add_peer(&peer))};
     }
 
     /// Удалить пир
-    enum class DeletePeerResult {
+    enum class PeerDelete {
         /// Пир успешно удален
         Ok,
         /// Протокол ESP-NOW не был инициализирован
@@ -150,8 +158,8 @@ struct EspNow {
     };
 
     /// Удалить пир
-    static DeletePeerResult deletePeer(const Mac &mac) {
-        return translateDeletePeerResult(esp_now_del_peer(mac.data()));
+    static Result<PeerDelete> deletePeer(const Mac &mac) {
+        return {translatePeerDelete(esp_now_del_peer(mac.data()))};
     }
 
     /// Проверить существование пира
@@ -160,7 +168,7 @@ struct EspNow {
     }
 
     /// Результат отправки сообщения
-    enum class SendResult {
+    enum class Send {
         /// Сообщение успешно отправлено
         Ok,
         /// Протокол ESP-NOW не был инициализирован
@@ -180,14 +188,16 @@ struct EspNow {
     };
 
     /// Отправить сообщение
-    template<typename T> static SendResult send(const Mac &mac, const T &value) {
+    template<typename T> static Result<Send> send(const Mac &mac, const T &value) {
         static_assert(sizeof(T) < ESP_NOW_MAX_DATA_LEN, "Message is too big!");
 
-        return translateSendResult(esp_now_send(
-            mac.data(),
-            reinterpret_cast<const u8 *>(&value),
-            sizeof(T)
-        ));
+        return {
+            translateSend(esp_now_send(
+                mac.data(),
+                reinterpret_cast<const u8 *>(&value),
+                sizeof(T)
+            ))
+        };
     }
 
 private:
@@ -219,82 +229,82 @@ private:
         return (status == ESP_NOW_SEND_SUCCESS) ? DeliveryStatus::Ok : DeliveryStatus::Fail;
     }
 
-    static InitResult translateInitResult(esp_err_t result) {
+    static Init translateInit(esp_err_t result) {
         switch (result) {
             case ESP_OK:
-                return InitResult::Ok;
+                return Init::Ok;
             case ESP_ERR_ESPNOW_INTERNAL:
-                return InitResult::InternalError;
+                return Init::InternalError;
             default:
-                return InitResult::UnknownError;
+                return Init::UnknownError;
         }
     }
 
-    static SetHandlerResult translateSetHandler(esp_err_t result) {
+    static SetHandler translateSetHandler(esp_err_t result) {
         switch (result) {
             case ESP_OK:
-                return SetHandlerResult::Ok;
+                return SetHandler::Ok;
             case ESP_ERR_ESPNOW_NOT_INIT:
-                return SetHandlerResult::NotInit;
+                return SetHandler::NotInit;
             case ESP_ERR_ESPNOW_INTERNAL:
-                return SetHandlerResult::InternalError;
+                return SetHandler::InternalError;
             default:
-                return SetHandlerResult::UnknownError;
+                return SetHandler::UnknownError;
         }
     }
 
-    static SendResult translateSendResult(esp_err_t result) {
+    static Send translateSend(esp_err_t result) {
         switch (result) {
             case ESP_OK:
-                return SendResult::Ok;
+                return Send::Ok;
             case ESP_ERR_ESPNOW_NOT_INIT:
-                return SendResult::NotInit;
+                return Send::NotInit;
             case ESP_ERR_ESPNOW_ARG:
-                return SendResult::InvalidArg;
+                return Send::InvalidArg;
             case ESP_ERR_ESPNOW_INTERNAL:
-                return SendResult::InternalError;
+                return Send::InternalError;
             case ESP_ERR_ESPNOW_NO_MEM:
-                return SendResult::NoMemory;
+                return Send::NoMemory;
             case ESP_ERR_ESPNOW_NOT_FOUND:
-                return SendResult::PeerNotFound;
+                return Send::PeerNotFound;
             case ESP_ERR_ESPNOW_IF:
-                return SendResult::IncorrectWiFiMode;
+                return Send::IncorrectWiFiMode;
             default:
-                return SendResult::UnknownError;
+                return Send::UnknownError;
         }
     }
 
-    static DeletePeerResult translateDeletePeerResult(esp_err_t result) {
+    static PeerDelete translatePeerDelete(esp_err_t result) {
         switch (result) {
             case ESP_OK:
-                return DeletePeerResult::Ok;
+                return PeerDelete::Ok;
             case ESP_ERR_ESPNOW_NOT_INIT:
-                return DeletePeerResult::NotInit;
+                return PeerDelete::NotInit;
             case ESP_ERR_ESPNOW_ARG:
-                return DeletePeerResult::InvalidArg;
+                return PeerDelete::InvalidArg;
             case ESP_ERR_ESPNOW_NOT_FOUND:
-                return DeletePeerResult::NotFound;
+                return PeerDelete::NotFound;
             default:
-                return DeletePeerResult::UnknownError;
+                return PeerDelete::UnknownError;
         }
     }
 
-    static AddPeerResult translateAddPeerResult(esp_err_t result) {
+    static PeerAdd translatePeerAdd(esp_err_t result) {
         switch (result) {
             case ESP_OK:
-                return AddPeerResult::Ok;
+                return PeerAdd::Ok;
             case ESP_ERR_ESPNOW_NOT_INIT:
-                return AddPeerResult::NotInit;
+                return PeerAdd::NotInit;
             case ESP_ERR_ESPNOW_ARG:
-                return AddPeerResult::InvalidArg;
+                return PeerAdd::InvalidArg;
             case ESP_ERR_ESPNOW_FULL:
-                return AddPeerResult::Full;
+                return PeerAdd::Full;
             case ESP_ERR_ESPNOW_NO_MEM:
-                return AddPeerResult::NoMemory;
+                return PeerAdd::NoMemory;
             case ESP_ERR_ESPNOW_EXIST:
-                return AddPeerResult::Exists;
+                return PeerAdd::Exists;
             default:
-                return AddPeerResult::UnknownError;
+                return PeerAdd::UnknownError;
         }
     }
 
@@ -310,6 +320,10 @@ public:
 
     // toString
 
+    template<typename E> static str toString(const Result<E> &result) {
+        return toString(result.value);
+    }
+
     static MacString toString(const Mac &mac) {
         MacString buff;
 
@@ -319,12 +333,12 @@ public:
         return buff;
     }
 
-    static str toString(SetHandlerResult result) {
-        switch (result) {
-            return_case(SetHandlerResult::Ok)
-            return_case(SetHandlerResult::NotInit)
-            return_case(SetHandlerResult::InternalError)
-            return_case(SetHandlerResult::UnknownError)
+    static str toString(SetHandler value) {
+        switch (value) {
+            return_case(SetHandler::Ok)
+            return_case(SetHandler::NotInit)
+            return_case(SetHandler::InternalError)
+            return_case(SetHandler::UnknownError)
             return_default()
         }
     }
@@ -337,49 +351,49 @@ public:
         }
     }
 
-    static str toString(InitResult result) {
-        switch (result) {
-            return_case(InitResult::Ok)
-            return_case(InitResult::InternalError)
-            return_case(InitResult::UnknownError)
+    static str toString(Init value) {
+        switch (value) {
+            return_case(Init::Ok)
+            return_case(Init::InternalError)
+            return_case(Init::UnknownError)
             return_default()
         }
     }
 
-    static str toString(AddPeerResult result) {
-        switch (result) {
-            return_case(AddPeerResult::Ok)
-            return_case(AddPeerResult::NotInit)
-            return_case(AddPeerResult::InvalidArg)
-            return_case(AddPeerResult::Full)
-            return_case(AddPeerResult::NoMemory)
-            return_case(AddPeerResult::Exists)
-            return_case(AddPeerResult::UnknownError)
+    static str toString(PeerAdd value) {
+        switch (value) {
+            return_case(PeerAdd::Ok)
+            return_case(PeerAdd::NotInit)
+            return_case(PeerAdd::InvalidArg)
+            return_case(PeerAdd::Full)
+            return_case(PeerAdd::NoMemory)
+            return_case(PeerAdd::Exists)
+            return_case(PeerAdd::UnknownError)
             return_default()
         }
     }
 
-    static str toString(DeletePeerResult result) {
-        switch (result) {
-            return_case(DeletePeerResult::Ok)
-            return_case(DeletePeerResult::NotInit)
-            return_case(DeletePeerResult::InvalidArg)
-            return_case(DeletePeerResult::NotFound)
-            return_case(DeletePeerResult::UnknownError)
+    static str toString(PeerDelete value) {
+        switch (value) {
+            return_case(PeerDelete::Ok)
+            return_case(PeerDelete::NotInit)
+            return_case(PeerDelete::InvalidArg)
+            return_case(PeerDelete::NotFound)
+            return_case(PeerDelete::UnknownError)
             return_default()
         }
     }
 
-    static str toString(SendResult result) {
-        switch (result) {
-            return_case(SendResult::Ok)
-            return_case(SendResult::NotInit)
-            return_case(SendResult::InvalidArg)
-            return_case(SendResult::InternalError)
-            return_case(SendResult::NoMemory)
-            return_case(SendResult::PeerNotFound)
-            return_case(SendResult::IncorrectWiFiMode)
-            return_case(SendResult::UnknownError)
+    static str toString(Send value) {
+        switch (value) {
+            return_case(Send::Ok)
+            return_case(Send::NotInit)
+            return_case(Send::InvalidArg)
+            return_case(Send::InternalError)
+            return_case(Send::NoMemory)
+            return_case(Send::PeerNotFound)
+            return_case(Send::IncorrectWiFiMode)
+            return_case(Send::UnknownError)
             return_default()
         }
     }

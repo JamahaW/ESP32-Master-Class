@@ -6,74 +6,99 @@
 #include <esp_err.h>
 #include <esp_now.h>
 #include <cstring>
+#include <esp_mac.h>
+
+
+#define return_case(__v) case __v: return #__v;
+#define return_default() default: return "Invalid";
 
 
 /// Обёртка над ESP-NOW API с использованием С++
 struct EspNow {
+    static constexpr char mac_format_string[] = "%02X:%02X:%02X:%02X:%02X:%02X";
+    using MacString = std::array<char, sizeof(mac_format_string)>;
+
     using u8 = uint8_t;
+    using str = const char *;
+
     /// Безопасный тип для MAC адреса
     using Mac = std::array<u8, ESP_NOW_ETH_ALEN>;
 
     /// Статус доставки
-    enum class SendStatus {
+    enum class DeliveryStatus {
         Ok, /// Пакет дошел до получателя
         Fail, /// Не удалось доставить пакет
     };
 
+    using OnDeliveryFunction = std::function<void(const Mac &, DeliveryStatus)>;
+    using OnReceiveFunction = std::function<void(const Mac &, const void *, int)>;
+
     /// Получить экземпляр протокола для настройки
     static EspNow &instance() {
         static EspNow instance = {
-            .on_send = nullptr,
-            .on_receive = nullptr
+            ._on_delivery = nullptr,
+            ._on_receive = nullptr
         };
         return instance;
     }
 
     /// Обработчик доставки сообщения
-    std::function<void(Mac, SendStatus)> on_send;
+    OnDeliveryFunction _on_delivery;
     /// Обработчик получения сообщения
-    std::function<void(Mac, const void *, u8 len)> on_receive;
+    OnReceiveFunction _on_receive;
 
     /// Результат инициализации
     enum class InitResult {
         Ok, /// Инициализация прошла успешно
-        InitFail, /// Не удалось инициализировать протокол ESP-NOW
-        ReceiveHandlerRegisterFail, /// Не удалось зарегистрировать обработчик поступающего сообщения
-        SendHandlerRegisterFail, /// Не удалось зарегистрировать обработчик проверки доставки
+        InternalError, /// Внутренняя ошибка ESP-NOW API
+        UnknownError, /// Неизвестная ошибка ESP API
     };
 
     /// Инициализировать протокол ESP-NOW
     static InitResult init() {
-        if (esp_now_init() == ESP_ERR_ESPNOW_INTERNAL) { return InitResult::InitFail; }
+        return translateInitResult(esp_now_init());
+    }
 
-        auto _on_receive = [](const u8 *mac, const u8 *data, int size) {
-            auto &self = EspNow::instance();
-            if (self.on_receive == nullptr) { return; }
-            self.on_receive(
-                castMac(mac),
-                static_cast<const void *>(data),
-                u8(size)
-            );
-        };
+    enum class SetHandlerResult {
+        Ok, /// Обработчик успешно подключен
+        NotInit, /// Протокол ESP-NOW не был инициализирован
+        InternalError, /// Внутренняя ошибка ESP-NOW API
+        UnknownError, /// Неизвестная ошибка ESP API
+    };
 
-        if (esp_now_register_recv_cb(_on_receive) != ESP_OK) { return InitResult::ReceiveHandlerRegisterFail; }
+    /// Установить обработчик входящих сообщений
+    SetHandlerResult setReceiveHandler(OnReceiveFunction &&handler) {
+        _on_receive = handler;
 
-        auto _on_send = [](const u8 *mac, esp_now_send_status_t status) {
-            auto &self = EspNow::instance();
-            if (self.on_send == nullptr) { return; }
-            self.on_send(
-                castMac(mac),
-                (status == ESP_NOW_SEND_SUCCESS) ? SendStatus::Ok : SendStatus::Fail
-            );
-        };
+        return translateSetHandler(
+            (
+                (handler == nullptr) ?
+                esp_now_register_recv_cb(onReceive) : esp_now_unregister_recv_cb()
+            )
+        );
+    }
 
-        if (esp_now_register_send_cb(_on_send) != ESP_OK) { return InitResult::SendHandlerRegisterFail; }
+    /// Установить обработчик при доставке сообщений
+    SetHandlerResult setDeliveryHandler(OnDeliveryFunction &&handler) {
+        _on_delivery = handler;
 
-        return InitResult::Ok;
+        return translateSetHandler(
+            (
+                (handler == nullptr) ?
+                esp_now_register_send_cb(onDelivery) : esp_now_unregister_send_cb()
+            )
+        );
     }
 
     /// Завершить работу протокола
     static void quit() { esp_now_deinit(); }
+
+    /// Получить свой MAC адрес
+    static Mac mac() {
+        Mac ret = {};
+        esp_read_mac(ret.data(), ESP_MAC_WIFI_STA);
+        return ret;
+    }
 
     /// Результат добавления пира
     enum class AddPeerResult {
@@ -91,24 +116,7 @@ struct EspNow {
         esp_now_peer_info_t peer = {};
         memcpy(peer.peer_addr, mac.data(), 6);
 
-        esp_err_t result = esp_now_add_peer(&peer);
-
-        switch (result) {
-            case ESP_OK:
-                return AddPeerResult::Ok;
-            case ESP_ERR_ESPNOW_NOT_INIT:
-                return AddPeerResult::NotInit;
-            case ESP_ERR_ESPNOW_ARG:
-                return AddPeerResult::InvalidArg;
-            case ESP_ERR_ESPNOW_FULL:
-                return AddPeerResult::Full;
-            case ESP_ERR_ESPNOW_NO_MEM:
-                return AddPeerResult::NoMemory;
-            case ESP_ERR_ESPNOW_EXIST:
-                return AddPeerResult::Exists;
-            default:
-                return AddPeerResult::UnknownError;
-        }
+        return translateAddPeerResult(esp_now_add_peer(&peer));
     }
 
     /// Удалить пир
@@ -122,20 +130,7 @@ struct EspNow {
 
     /// Удалить пир
     static DeletePeerResult deletePeer(const Mac &mac) {
-        esp_err_t result = esp_now_del_peer(mac.data());
-
-        switch (result) {
-            case ESP_OK:
-                return DeletePeerResult::Ok;
-            case ESP_ERR_ESPNOW_NOT_INIT:
-                return DeletePeerResult::NotInit;
-            case ESP_ERR_ESPNOW_ARG:
-                return DeletePeerResult::InvalidArg;
-            case ESP_ERR_ESPNOW_NOT_FOUND:
-                return DeletePeerResult::NotFound;
-            default:
-                return DeletePeerResult::UnknownError;
-        }
+        return translateDeletePeerResult(esp_now_del_peer(mac.data()));
     }
 
     /// Проверить существование пира
@@ -157,14 +152,65 @@ struct EspNow {
 
     /// Отправить сообщение
     template<typename T> static SendResult send(const Mac &mac, const T &value) {
-        static_assert(sizeof(T) < 250, "Message is too big!");
+        static_assert(sizeof(T) < ESP_NOW_MAX_DATA_LEN, "Message is too big!");
 
-        esp_err_t result = esp_now_send(
+        return translateSendResult(esp_now_send(
             mac.data(),
             reinterpret_cast<const u8 *>(&value),
             sizeof(T)
-        );
+        ));
+    }
 
+private:
+
+    static void onReceive(const u8 *mac, const u8 *data, int size) {
+        instance()._on_receive(
+            castMac(mac),
+            static_cast<const void *>(data),
+            size
+        );
+    }
+
+    static void onDelivery(const u8 *mac, esp_now_send_status_t status) {
+        instance()._on_delivery(
+            castMac(mac),
+            translateDeliveryStatus(status)
+        );
+    }
+
+    inline static const Mac &castMac(const u8 *mac) {
+        return *reinterpret_cast<const Mac *>(mac);
+    }
+
+    static DeliveryStatus translateDeliveryStatus(esp_now_send_status_t status) {
+        return (status == ESP_NOW_SEND_SUCCESS) ? DeliveryStatus::Ok : DeliveryStatus::Fail;
+    }
+
+    static InitResult translateInitResult(esp_err_t result) {
+        switch (result) {
+            case ESP_OK:
+                return InitResult::Ok;
+            case ESP_ERR_ESPNOW_INTERNAL:
+                return InitResult::InternalError;
+            default:
+                return InitResult::UnknownError;
+        }
+    }
+
+    static SetHandlerResult translateSetHandler(esp_err_t result) {
+        switch (result) {
+            case ESP_OK:
+                return SetHandlerResult::Ok;
+            case ESP_ERR_ESPNOW_NOT_INIT:
+                return SetHandlerResult::NotInit;
+            case ESP_ERR_ESPNOW_INTERNAL:
+                return SetHandlerResult::InternalError;
+            default:
+                return SetHandlerResult::UnknownError;
+        }
+    }
+
+    static SendResult translateSendResult(esp_err_t result) {
         switch (result) {
             case ESP_OK:
                 return SendResult::Ok;
@@ -185,14 +231,116 @@ struct EspNow {
         }
     }
 
+    static DeletePeerResult translateDeletePeerResult(esp_err_t result) {
+        switch (result) {
+            case ESP_OK:
+                return DeletePeerResult::Ok;
+            case ESP_ERR_ESPNOW_NOT_INIT:
+                return DeletePeerResult::NotInit;
+            case ESP_ERR_ESPNOW_ARG:
+                return DeletePeerResult::InvalidArg;
+            case ESP_ERR_ESPNOW_NOT_FOUND:
+                return DeletePeerResult::NotFound;
+            default:
+                return DeletePeerResult::UnknownError;
+        }
+    }
+
+    static AddPeerResult translateAddPeerResult(esp_err_t result) {
+        switch (result) {
+            case ESP_OK:
+                return AddPeerResult::Ok;
+            case ESP_ERR_ESPNOW_NOT_INIT:
+                return AddPeerResult::NotInit;
+            case ESP_ERR_ESPNOW_ARG:
+                return AddPeerResult::InvalidArg;
+            case ESP_ERR_ESPNOW_FULL:
+                return AddPeerResult::Full;
+            case ESP_ERR_ESPNOW_NO_MEM:
+                return AddPeerResult::NoMemory;
+            case ESP_ERR_ESPNOW_EXIST:
+                return AddPeerResult::Exists;
+            default:
+                return AddPeerResult::UnknownError;
+        }
+    }
+
+public:
+
     EspNow() = delete;
 
     EspNow(const EspNow &) = delete;
 
     EspNow &operator=(const EspNow &) = delete;
 
-private:
-    inline static const Mac &castMac(const u8 *mac) {
-        return *reinterpret_cast<const Mac *>(mac);
+    static str toString(SetHandlerResult result) {
+        switch (result) {
+            return_case(SetHandlerResult::Ok)
+            return_case(SetHandlerResult::NotInit)
+            return_case(SetHandlerResult::InternalError)
+            return_case(SetHandlerResult::UnknownError)
+            return_default()
+        }
+    }
+
+    static str toString(DeliveryStatus status) {
+        switch (status) {
+            return_case(DeliveryStatus::Ok)
+            return_case(DeliveryStatus::Fail)
+            return_default()
+        }
+    }
+
+    static str toString(InitResult result) {
+        switch (result) {
+            return_case(InitResult::Ok)
+            return_case(InitResult::InternalError)
+            return_case(InitResult::UnknownError)
+            return_default()
+        }
+    }
+
+    static str toString(AddPeerResult result) {
+        switch (result) {
+            return_case(AddPeerResult::Ok)
+            return_case(AddPeerResult::NotInit)
+            return_case(AddPeerResult::InvalidArg)
+            return_case(AddPeerResult::Full)
+            return_case(AddPeerResult::NoMemory)
+            return_case(AddPeerResult::Exists)
+            return_case(AddPeerResult::UnknownError)
+            return_default()
+        }
+    }
+
+    static str toString(DeletePeerResult result) {
+        switch (result) {
+            return_case(DeletePeerResult::Ok)
+            return_case(DeletePeerResult::NotInit)
+            return_case(DeletePeerResult::InvalidArg)
+            return_case(DeletePeerResult::NotFound)
+            return_case(DeletePeerResult::UnknownError)
+            return_default()
+        }
+    }
+
+    static str toString(SendResult result) {
+        switch (result) {
+            return_case(SendResult::Ok)
+            return_case(SendResult::NotInit)
+            return_case(SendResult::InvalidArg)
+            return_case(SendResult::InternalError)
+            return_case(SendResult::NoMemory)
+            return_case(SendResult::PeerNotFound)
+            return_case(SendResult::IncorrectWiFiMode)
+            return_case(SendResult::UnknownError)
+            return_default()
+        }
+    }
+
+    static MacString toString(const Mac &mac) {
+        MacString buff;
+        sprintf(buff.data(), mac_format_string, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        return buff;
     }
 };

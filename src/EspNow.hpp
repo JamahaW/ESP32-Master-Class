@@ -336,12 +336,8 @@ public:
     }
 
     static MacString toString(const Mac &mac) {
-        MacString buff;
-
         auto raw = mac.data();
-        sprintf(buff.data(), mac_format_string, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
-
-        return buff;
+        return formatted<sizeof(mac_format_string)>(mac_format_string, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
     }
 
     static str toString(SetHandler value) {

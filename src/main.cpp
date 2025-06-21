@@ -10,11 +10,8 @@
 /// Логирование операций EspNow
 #define log(__EspNow_api_Result_func) ({auto __r = __EspNow_api_Result_func; Serial.printf(#__EspNow_api_Result_func " -> %s\n", EspNow::toString(__r));})
 
-/// Адрес сервера
-constexpr EspNow::Mac server = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
-
 /// Тип пакета сообщения от сервера
-using ServerMessage = std::array<char, 64>;
+using ServerMessage = std::array<char, 128>;
 
 /// Тип пакета сообщения от игрока
 using PlayerMessage = std::array<char, 16>;
@@ -27,9 +24,7 @@ struct [[gnu::packed]] PlayerMove {
     Position x, y;
 };
 
-
 namespace game {
-
     /// Данные пользователя
     struct Player {
         /// Отображаемое имя пользователя
@@ -43,7 +38,9 @@ namespace game {
             return {username, team};
         }
     };
+}
 
+namespace game {
     /// Результат действия игры
     enum class MakeMove {
         /// Успешный ход
@@ -54,9 +51,13 @@ namespace game {
         FieldNotEmpty,
     };
 
+    /// todo Сделать методом окружения
     Result<MakeMove> makeMove(const Player &player, const PlayerMove &move) {
         return {MakeMove::Ok};
     }
+}
+
+namespace game {
 
     /// Хост игры
     struct Host {
@@ -227,6 +228,10 @@ namespace game {
         }
     };
 }
+
+/// Адрес сервера
+constexpr EspNow::Mac server = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
+
 
 /// Запуск сервера
 [[noreturn]] void runServer() {

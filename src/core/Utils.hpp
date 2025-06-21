@@ -2,10 +2,7 @@
 
 #include <array>
 #include <cstdarg>
-#include "EspNow.hpp"
 
-/// Логирование операций EspNow
-#define log(__EspNow_api_Result_func) ({auto __r = __EspNow_api_Result_func; Serial.printf(#__EspNow_api_Result_func " -> %s\n", EspNow::toString(__r));})
 
 /// Получить форматированную строку
 template<size_t N> std::array<char, N> formatted(const char *format, ...) {

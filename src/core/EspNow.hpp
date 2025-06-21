@@ -9,6 +9,7 @@
 #include <esp_mac.h>
 
 #include "Result.hpp"
+#include "Utils.hpp"
 
 
 #define return_case(__v) case __v: return #__v;

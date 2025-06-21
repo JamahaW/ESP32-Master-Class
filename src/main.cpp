@@ -6,6 +6,25 @@
 
 #include "WiFi.h"
 
+#include "GyverOLED.h"
+
+
+struct OledAdapter : GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> {
+    uint8_t last_data{0};
+
+    size_t write(uint8_t data) override {
+
+        if (last_data == '\n' or isEnd()) {
+            clear();
+            home();
+        }
+
+        last_data = data;
+
+        return GyverOLED::write(data);
+    }
+};
+
 
 /// Адрес сервера
 const EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
@@ -26,7 +45,11 @@ const EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
 /// Запуск клиента
 [[noreturn]] void runClient() {
-    game::impl::Client client(server_address, Serial);
+    OledAdapter oled_adapter;
+    oled_adapter.init();
+    oled_adapter.autoPrintln(true);
+
+    game::impl::Client client(server_address, oled_adapter);
 
     client.init();
 

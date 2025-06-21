@@ -23,8 +23,11 @@ namespace game {
             /// Игровое окружение
             core::Environment &environment;
 
+            /// Поток отображения сообщений
+            Print &out;
+
             /// Сведения о клиентах
-            std::map<EspNow::Mac, core::Player> clients;
+            std::map<EspNow::Mac, core::Player> clients{};
 
             struct SendRecord {
                 EspNow::Mac mac;
@@ -32,7 +35,7 @@ namespace game {
             };
 
             /// Очередь отложенных сообщений
-            std::queue<SendRecord> sends;
+            std::queue<SendRecord> sends{};
 
             struct MoveRecord {
                 EspNow::Mac mac;
@@ -41,12 +44,12 @@ namespace game {
             };
 
             /// Очередь отложенных ходов
-            std::queue<MoveRecord> moves;
+            std::queue<MoveRecord> moves{};
 
         public:
 
-            explicit Host(core::Environment &environment) :
-                environment(environment) {}
+            explicit Host(core::Environment &environment, Print &out) :
+                environment{environment}, out{out} {}
 
             void pull() {
                 delay(50);
@@ -74,13 +77,13 @@ namespace game {
 
                     auto result = EspNow::send(record.mac, record.message);
 
-                    Serial.printf("Sending reply to %s .. ", EspNow::toString(record.mac).data());
+                    out.printf("Sending reply to %s .. ", EspNow::toString(record.mac).data());
 
                     if (result.ok()) {
                         sends.pop();
-                        Serial.printf("Ok -> %s\n", record.message.data());
+                        out.printf("Ok   -> %s\n", record.message.data());
                     } else {
-                        Serial.printf("Fail -> %s\n", EspNow::toString(result));
+                        out.printf("Fail -> %s\n", EspNow::toString(result));
                     }
                 }
             }
@@ -162,7 +165,7 @@ namespace game {
         protected:
 
             void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) final {
-                Serial.printf(
+                out.printf(
                     "Delivery to client %s : %s\n",
                     EspNow::toString(mac).data(),
                     EspNow::toString(status)

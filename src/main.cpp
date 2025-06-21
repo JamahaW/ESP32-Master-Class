@@ -19,7 +19,7 @@ void initWiFiSTA();
 [[noreturn]] void runServer() {
     game::core::Environment environment;
 
-    game::impl::Host host(environment);
+    game::impl::Host host(environment, Serial);
 
     host.init();
 
@@ -30,14 +30,12 @@ void initWiFiSTA();
 
 /// Запуск клиента
 [[noreturn]] void runClient() {
-    game::impl::Client client(server_address);
+    game::impl::Client client(server_address, Serial);
 
     client.init();
 
     client.sendMessage(game::core::ClientMessage{"OriginalName"});
-
     delay(2000);
-
     client.sendMessage(game::core::ClientMessage{"OtherName"});
 
     while (true) {

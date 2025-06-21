@@ -1,6 +1,6 @@
 #pragma once
 
-#include <HardwareSerial.h>
+#include <Print.h>
 #include "game/core/Protocol.hpp"
 #include "game/abc/Node.hpp"
 
@@ -13,9 +13,11 @@ namespace game {
 
             /// Адрес сервера
             const EspNow::Mac &server;
+            /// Поток отображения сообщений
+            Print &out;
 
-            explicit Client(const EspNow::Mac &server) :
-                server{server} {
+            explicit Client(const EspNow::Mac &server, Print &out) :
+                server{server}, out{out} {
                 EspNow::addPeer(server);
             }
 
@@ -32,7 +34,7 @@ namespace game {
         protected:
 
             void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) final {
-                Serial.printf(
+                out.printf(
                     "Delivery to server %s : %s\n",
                     EspNow::toString(mac).data(),
                     EspNow::toString(status)
@@ -42,7 +44,7 @@ namespace game {
             void onReceive(const EspNow::Mac &mac, const void *data, int size) final {
                 // Проверка, что сообщение пришло от сервера
                 if (mac != server) {
-                    Serial.printf(
+                    out.printf(
                         "Message (%d Bytes) from %s (not server)\n",
                         size,
                         EspNow::toString(mac).data());
@@ -51,7 +53,7 @@ namespace game {
 
                 // Проверка размера пакета
                 if (size != sizeof(core::ServerMessage)) {
-                    Serial.printf(
+                    out.printf(
                         "Got message from %s (server) with incorrect size (%d) expected (%d)\n",
                         EspNow::toString(mac).data(),
                         size,
@@ -60,8 +62,8 @@ namespace game {
                 }
 
                 const auto &message = *static_cast<const core::ServerMessage *>(data);
-                Serial.print("Server: ");
-                Serial.println(message.data());
+                out.print("Server: ");
+                out.println(message.data());
             }
         };
     }

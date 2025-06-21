@@ -3,32 +3,30 @@
 #include "game/core/Protocol.hpp"
 
 #include <Arduino.h>
-
 #include "WiFi.h"
 
 #include "GyverOLED.h"
 
 
+using game::core::ClientMessage;
+using game::core::ClientMove;
+
 struct OledAdapter : GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> {
-    uint8_t last_data{0};
-
     size_t write(uint8_t data) override {
-
-        if (last_data == '\n' or isEnd()) {
+        if (isEnd()) {
             clear();
             home();
         }
-
-        last_data = data;
-
         return GyverOLED::write(data);
     }
 };
 
 
 /// Адрес сервера
-const EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
+constexpr EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
+/// Адрес Рандом Трона 3000
+constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30};
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
@@ -43,25 +41,40 @@ const EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
     }
 }
 
-/// Запуск клиента
-[[noreturn]] void runClient() {
-    OledAdapter oled_adapter;
-    oled_adapter.init();
-    oled_adapter.autoPrintln(true);
+/// Запуск клиента Рандом трона 3000
+[[noreturn]] void runClientRandomTron3000() {
+    OledAdapter screen;
+    screen.init();
+    screen.autoPrintln(true);
 
-    game::impl::Client client(server_address, oled_adapter);
+    game::impl::Client client(server_address, screen);
 
     client.init();
+    client.sendMessage(ClientMessage{"RandomTron-3000"});
 
-    client.sendMessage(game::core::ClientMessage{"OriginalName"});
-    delay(2000);
-    client.sendMessage(game::core::ClientMessage{"OtherName"});
+    auto rand = []() {
+        return ClientMove::Position(random() & 0b1111);
+    };
 
     while (true) {
-        client.sendMove(game::core::ClientMove{123, 69});
+        client.sendMove(ClientMove{rand(), rand()});
+        delay(rand() * 300);
+    }
+}
+
+/// Запуск клиента пользователя
+[[noreturn]] void runClientUser() {
+    game::impl::Client client(server_address, Serial);
+
+    client.init();
+    client.sendMessage(ClientMessage{"User"});
+
+    while (true) {
+        client.sendMove(ClientMove{123, 69});
         delay(5000);
     }
 }
+
 
 void setup() {
     Serial.begin(115200);
@@ -82,7 +95,11 @@ void setup() {
     if (is_server) {
         runServer();
     } else {
-        runClient();
+        if (esp_now.mac == random_tron_address) {
+            runClientRandomTron3000();
+        } else {
+            runClientUser();
+        }
     }
 }
 

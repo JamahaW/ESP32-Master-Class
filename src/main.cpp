@@ -17,7 +17,9 @@ void initWiFiSTA();
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
-    game::impl::Host host;
+    game::core::Environment environment;
+
+    game::impl::Host host(environment);
 
     host.init();
 
@@ -26,16 +28,21 @@ void initWiFiSTA();
     }
 }
 
-
 /// Запуск клиента
 [[noreturn]] void runClient() {
     game::impl::Client client(server_address);
 
     client.init();
-    client.sendMessage(game::core::ClientMessage{"DarkWoldX17"});
+
+    client.sendMessage(game::core::ClientMessage{"OriginalName"});
+
+    delay(2000);
+
+    client.sendMessage(game::core::ClientMessage{"OtherName"});
 
     while (true) {
-        client.pull();
+        client.sendMove(game::core::ClientMove{123, 69});
+        delay(5000);
     }
 }
 

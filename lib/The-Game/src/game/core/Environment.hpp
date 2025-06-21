@@ -8,21 +8,22 @@
 namespace game {
     namespace core {
 
-        /// Результат действия игры
-        enum class MakeMove {
-            /// Успешный ход
-            Ok = 0,
-            /// Неверное значение хода
-            InvalidArg,
-            /// Поле занято
-            FieldNotEmpty,
+        /// Игровое окружение
+        struct Environment {
+
+            /// Результат действия игры
+            enum class MakeMove {
+                /// Успешный ход
+                Ok = 0,
+                /// Неверное значение хода
+                InvalidArg,
+                /// Поле занято
+                FieldNotEmpty,
+            };
+
+            rs::Result<MakeMove> makeMove(const Player &player, const ClientMove &move) {
+                return {MakeMove::Ok};
+            }
         };
-
-        /// todo Сделать методом окружения
-        rs::Result<MakeMove> makeMove(const Player &player, const ClientMove &move) {
-            return {MakeMove::Ok};
-        }
-
-        struct Environment {};
     }
 }

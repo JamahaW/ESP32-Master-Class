@@ -18,8 +18,13 @@ namespace game {
         /// Хост игры
         struct Host : abc::Node {
 
+        private:
+
+            /// Игровое окружение
+            core::Environment &environment;
+
             /// Сведения о клиентах
-            std::map<EspNow::Mac, core::Player> _clients;
+            std::map<EspNow::Mac, core::Player> clients;
 
             struct SendRecord {
                 EspNow::Mac mac;
@@ -27,7 +32,7 @@ namespace game {
             };
 
             /// Очередь отложенных сообщений
-            std::queue<SendRecord> _sends;
+            std::queue<SendRecord> sends;
 
             struct MoveRecord {
                 EspNow::Mac mac;
@@ -36,15 +41,20 @@ namespace game {
             };
 
             /// Очередь отложенных ходов
-            std::queue<MoveRecord> _moves;
+            std::queue<MoveRecord> moves;
+
+        public:
+
+            explicit Host(core::Environment &environment) :
+                environment(environment) {}
 
             void pull() {
                 delay(50);
 
-                if (not _moves.empty()) {
-                    auto record = _moves.front();
+                if (not moves.empty()) {
+                    auto record = moves.front();
 
-                    auto result = core::makeMove(record.player, record.move); // todo заменить на игру
+                    auto result = environment.makeMove(record.player, record.move);
 
                     if (result.ok()) {
                         send(record.mac, core::ServerMessage{"Move Ok"});
@@ -52,11 +62,11 @@ namespace game {
                         send(record.mac, core::ServerMessage{"Move error"});
                     }
 
-                    _moves.pop();
+                    moves.pop();
                 }
 
-                if (not _sends.empty()) {
-                    auto record = _sends.front();
+                if (not sends.empty()) {
+                    auto record = sends.front();
 
                     if (not EspNow::checkPeerExist(record.mac)) {
                         EspNow::addPeer(record.mac);
@@ -67,7 +77,7 @@ namespace game {
                     Serial.printf("Sending reply to %s .. ", EspNow::toString(record.mac).data());
 
                     if (result.ok()) {
-                        _sends.pop();
+                        sends.pop();
                         Serial.printf("Ok -> %s\n", record.message.data());
                     } else {
                         Serial.printf("Fail -> %s\n", EspNow::toString(result));
@@ -80,13 +90,13 @@ namespace game {
             // Обработчики сообщений
 
             void onPlayerMessage(const EspNow::Mac &mac, const core::ClientMessage &message) {
-                const auto &it = _clients.find(mac);
+                const auto &it = clients.find(mac);
 
-                if (it == _clients.end()) {
+                if (it == clients.end()) {
                     // Игрок ещё не существует - регистрируем
 
                     const auto &player = core::Player::create(message);
-                    _clients.emplace(mac, player);
+                    clients.emplace(mac, player);
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                         "Client %s registered as '%s' team: %d",
@@ -111,9 +121,9 @@ namespace game {
             }
 
             void onPlayerMove(const EspNow::Mac &mac, const core::ClientMove &move) {
-                const auto &it = _clients.find(mac);
+                const auto &it = clients.find(mac);
 
-                if (it == _clients.end()) {
+                if (it == clients.end()) {
                     // Игрок не зарегистрирован - отказ в действии
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
@@ -126,7 +136,7 @@ namespace game {
 
                     auto &player = it->second;
 
-                    _moves.push(MoveRecord{mac, player, move});
+                    moves.push(MoveRecord{mac, player, move});
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                         "Client %s (Player %s) move send to queue",
@@ -144,7 +154,7 @@ namespace game {
 
             /// Добавить сообщение в очередь на отправку
             void send(const EspNow::Mac &mac, core::ServerMessage message) {
-                _sends.push(SendRecord{mac, message});
+                sends.push(SendRecord{mac, message});
             }
 
             // Обработчики событий

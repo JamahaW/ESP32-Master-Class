@@ -8,6 +8,7 @@
 namespace game {
     namespace impl {
 
+        /// Клиент игры
         struct Client : abc::Node {
 
             /// Адрес сервера
@@ -18,14 +19,14 @@ namespace game {
                 EspNow::addPeer(server);
             }
 
+            /// Отправить сообщение
             void sendMessage(core::ClientMessage &&message) const {
                 EspNow::send(server, message);
             }
 
-            void pull() const {
-                EspNow::send(server, core::ClientMove{123, 69});
-
-                delay(5000);
+            /// Отправить ход
+            void sendMove(core::ClientMove &&move) const {
+                EspNow::send(server, move);
             }
 
         protected:

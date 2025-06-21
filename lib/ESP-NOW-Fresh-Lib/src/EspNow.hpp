@@ -8,8 +8,8 @@
 #include <esp_now.h>
 #include <esp_mac.h>
 
-#include "Result.hpp"
-#include "Utils.hpp"
+#include "rs/Result.hpp"
+#include "rs/Utils.hpp"
 
 
 #define return_case(__v) case __v: return #__v;
@@ -68,7 +68,7 @@ struct EspNow {
     };
 
     /// Инициализировать протокол ESP-NOW
-    static Result<Init> init() {
+    static rs::Result<Init> init() {
         return {translateInit(esp_now_init())};
     }
 
@@ -84,7 +84,7 @@ struct EspNow {
     };
 
     /// Установить обработчик входящих сообщений
-    Result<SetHandler> setReceiveHandler(OnReceiveFunction &&handler) {
+    rs::Result<SetHandler> setReceiveHandler(OnReceiveFunction &&handler) {
         _on_receive = std::move(handler);
 
         esp_err_t result;
@@ -99,7 +99,7 @@ struct EspNow {
     }
 
     /// Установить обработчик при доставке сообщений
-    Result<SetHandler> setDeliveryHandler(OnDeliveryFunction &&handler) {
+    rs::Result<SetHandler> setDeliveryHandler(OnDeliveryFunction &&handler) {
         _on_delivery = std::move(handler);
 
         esp_err_t result;
@@ -135,7 +135,7 @@ struct EspNow {
     };
 
     /// Добавить пир
-    static Result<PeerAdd> addPeer(const Mac &mac) {
+    static rs::Result<PeerAdd> addPeer(const Mac &mac) {
         esp_now_peer_info_t peer = {
             .channel = 0,
             .ifidx = WIFI_IF_STA,
@@ -162,7 +162,7 @@ struct EspNow {
     };
 
     /// Удалить пир
-    static Result<PeerDelete> deletePeer(const Mac &mac) {
+    static rs::Result<PeerDelete> deletePeer(const Mac &mac) {
         return {translatePeerDelete(esp_now_del_peer(mac.data()))};
     }
 
@@ -192,7 +192,7 @@ struct EspNow {
     };
 
     /// Отправить сообщение
-    template<typename T> static Result<Send> send(const Mac &mac, const T &value) {
+    template<typename T> static rs::Result<Send> send(const Mac &mac, const T &value) {
         static_assert(sizeof(T) < ESP_NOW_MAX_DATA_LEN, "Message is too big!");
 
         return {
@@ -331,13 +331,13 @@ public:
 
     // toString
 
-    template<typename E> static str toString(const Result<E> &result) {
+    template<typename E> static str toString(const rs::Result<E> &result) {
         return toString(result.value);
     }
 
     static MacString toString(const Mac &mac) {
         auto raw = mac.data();
-        return formatted<sizeof(mac_format_string)>(mac_format_string, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
+        return rs::formatted<sizeof(mac_format_string)>(mac_format_string, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
     }
 
     static str toString(SetHandler value) {

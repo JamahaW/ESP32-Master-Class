@@ -1,7 +1,7 @@
 #pragma once
 
 #include <HardwareSerial.h>
-#include "core/EspNow.hpp"
+#include "EspNow.hpp"
 #include "game/Protocol.hpp"
 
 

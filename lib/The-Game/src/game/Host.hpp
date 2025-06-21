@@ -3,8 +3,8 @@
 #include <map>
 #include <queue>
 
-#include "core/EspNow.hpp"
-#include "core/Utils.hpp"
+#include "EspNow.hpp"
+#include "rs/Utils.hpp"
 
 #include "game/Player.hpp"
 #include "game/Protocol.hpp"
@@ -101,7 +101,7 @@ namespace game {
                 const auto &player = Player::create(message);
                 _clients.emplace(mac, player);
 
-                send(mac, formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(ServerMessage)>(
                     "Client %s registered as '%s' team: %d",
                     EspNow::toString(mac).data(),
                     player.username.data(),
@@ -112,7 +112,7 @@ namespace game {
 
                 auto &player = it->second;
 
-                send(mac, formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(ServerMessage)>(
                     "Client %s renamed from '%s' to '%s'",
                     EspNow::toString(mac).data(),
                     player.username.data(),
@@ -129,7 +129,7 @@ namespace game {
             if (it == _clients.end()) {
                 // Игрок не зарегистрирован - отказ в действии
 
-                send(mac, formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(ServerMessage)>(
                     "Client %s (Not registered) move denied",
                     EspNow::toString(mac).data()
                 ));
@@ -141,7 +141,7 @@ namespace game {
 
                 _moves.push(MoveRecord{mac, player, move});
 
-                send(mac, formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(ServerMessage)>(
                     "Client %s (Player %s) move send to queue",
                     EspNow::toString(mac).data(),
                     player.username.data()
@@ -150,7 +150,7 @@ namespace game {
         }
 
         void onPlayerUnknown(const EspNow::Mac &mac, int size) {
-            send(mac, formatted<sizeof(ServerMessage)>("Invalid Packed (%d Bytes)", size));
+            send(mac, rs::formatted<sizeof(ServerMessage)>("Invalid Packed (%d Bytes)", size));
         }
 
         // сервис

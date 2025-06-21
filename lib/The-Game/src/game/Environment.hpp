@@ -1,6 +1,6 @@
 #pragma once
 
-#include "core/Result.hpp"
+#include "rs/Result.hpp"
 #include "game/Player.hpp"
 
 
@@ -18,7 +18,7 @@ namespace game {
     // Environment
 
     /// todo Сделать методом окружения
-    Result <MakeMove> makeMove(const Player &player, const ClientMove &move) {
+    rs::Result<MakeMove> makeMove(const Player &player, const ClientMove &move) {
         return {MakeMove::Ok};
     }
 }

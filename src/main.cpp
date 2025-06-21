@@ -2,8 +2,6 @@
 #include "game/Host.hpp"
 #include "game/Protocol.hpp"
 
-#include "core/EspNow.hpp"
-
 #include <Arduino.h>
 
 #include <esp_wifi.h>

@@ -6,9 +6,9 @@
 #include "EspNow.hpp"
 #include "rs/Utils.hpp"
 
-#include "game/Player.hpp"
-#include "game/Protocol.hpp"
-#include "game/Environment.hpp"
+#include "game/core/Player.hpp"
+#include "game/core/Protocol.hpp"
+#include "game/core/Environment.hpp"
 
 
 namespace game {
@@ -17,11 +17,11 @@ namespace game {
     struct Host {
 
         /// Сведения о клиентах
-        std::map<EspNow::Mac, Player> _clients;
+        std::map<EspNow::Mac, core::Player> _clients;
 
         struct SendRecord {
             EspNow::Mac mac;
-            ServerMessage message;
+            core::ServerMessage message;
         };
 
         /// Очередь отложенных сообщений
@@ -29,8 +29,8 @@ namespace game {
 
         struct MoveRecord {
             EspNow::Mac mac;
-            const Player &player;
-            const ClientMove move;
+            const core::Player &player;
+            const core::ClientMove move;
         };
 
         /// Очередь отложенных ходов
@@ -57,12 +57,12 @@ namespace game {
             if (not _moves.empty()) {
                 auto record = _moves.front();
 
-                auto result = game::makeMove(record.player, record.move); // todo заменить на игру
+                auto result = core::makeMove(record.player, record.move); // todo заменить на игру
 
                 if (result.ok()) {
-                    send(record.mac, ServerMessage{"Move Ok"});
+                    send(record.mac, core::ServerMessage{"Move Ok"});
                 } else {
-                    send(record.mac, ServerMessage{"Move error"});
+                    send(record.mac, core::ServerMessage{"Move error"});
                 }
 
                 _moves.pop();
@@ -92,16 +92,16 @@ namespace game {
 
         // Обработчики сообщений
 
-        void onPlayerMessage(const EspNow::Mac &mac, const ClientMessage &message) {
+        void onPlayerMessage(const EspNow::Mac &mac, const core::ClientMessage &message) {
             const auto &it = _clients.find(mac);
 
             if (it == _clients.end()) {
                 // Игрок ещё не существует - регистрируем
 
-                const auto &player = Player::create(message);
+                const auto &player = core::Player::create(message);
                 _clients.emplace(mac, player);
 
-                send(mac, rs::formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                     "Client %s registered as '%s' team: %d",
                     EspNow::toString(mac).data(),
                     player.username.data(),
@@ -112,7 +112,7 @@ namespace game {
 
                 auto &player = it->second;
 
-                send(mac, rs::formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                     "Client %s renamed from '%s' to '%s'",
                     EspNow::toString(mac).data(),
                     player.username.data(),
@@ -123,13 +123,13 @@ namespace game {
             }
         }
 
-        void onPlayerMove(const EspNow::Mac &mac, const ClientMove &move) {
+        void onPlayerMove(const EspNow::Mac &mac, const core::ClientMove &move) {
             const auto &it = _clients.find(mac);
 
             if (it == _clients.end()) {
                 // Игрок не зарегистрирован - отказ в действии
 
-                send(mac, rs::formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                     "Client %s (Not registered) move denied",
                     EspNow::toString(mac).data()
                 ));
@@ -141,7 +141,7 @@ namespace game {
 
                 _moves.push(MoveRecord{mac, player, move});
 
-                send(mac, rs::formatted<sizeof(ServerMessage)>(
+                send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                     "Client %s (Player %s) move send to queue",
                     EspNow::toString(mac).data(),
                     player.username.data()
@@ -150,13 +150,13 @@ namespace game {
         }
 
         void onPlayerUnknown(const EspNow::Mac &mac, int size) {
-            send(mac, rs::formatted<sizeof(ServerMessage)>("Invalid Packed (%d Bytes)", size));
+            send(mac, rs::formatted<sizeof(core::ServerMessage)>("Invalid Packed (%d Bytes)", size));
         }
 
         // сервис
 
         /// Добавить сообщение в очередь на отправку
-        void send(const EspNow::Mac &mac, ServerMessage message) {
+        void send(const EspNow::Mac &mac, core::ServerMessage message) {
             _sends.push(SendRecord{mac, message});
         }
 
@@ -172,12 +172,12 @@ namespace game {
 
         void onReceive(const EspNow::Mac &mac, const void *data, int size) {
             switch (size) {
-                case sizeof(ClientMessage):
-                    onPlayerMessage(mac, *static_cast<const ClientMessage *>(data));
+                case sizeof(core::ClientMessage):
+                    onPlayerMessage(mac, *static_cast<const core::ClientMessage *>(data));
                     return;
 
-                case sizeof(ClientMove):
-                    onPlayerMove(mac, *static_cast<const ClientMove *>(data));
+                case sizeof(core::ClientMove):
+                    onPlayerMove(mac, *static_cast<const core::ClientMove *>(data));
                     return;
 
                 default:

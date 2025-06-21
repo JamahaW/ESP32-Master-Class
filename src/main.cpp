@@ -1,6 +1,6 @@
-#include "game/Client.hpp"
-#include "game/Host.hpp"
-#include "game/Protocol.hpp"
+#include "game/impl/Client.hpp"
+#include "game/impl/Host.hpp"
+#include "game/core/Protocol.hpp"
 
 #include <Arduino.h>
 

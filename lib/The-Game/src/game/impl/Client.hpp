@@ -2,7 +2,7 @@
 
 #include <HardwareSerial.h>
 #include "EspNow.hpp"
-#include "game/Protocol.hpp"
+#include "game/core/Protocol.hpp"
 
 
 namespace game {
@@ -27,13 +27,13 @@ namespace game {
 
             EspNow::addPeer(server);
 
-            ClientMessage message = {"DarkWoldX17"};
+            core::ClientMessage message = {"DarkWoldX17"};
 
             EspNow::send(server, message);
         }
 
         void pull() {
-            EspNow::send(server, ClientMove{123, 69});
+            EspNow::send(server, core::ClientMove{123, 69});
 
             delay(5000);
         }
@@ -59,16 +59,16 @@ namespace game {
             }
 
             // Проверка размера пакета
-            if (size != sizeof(ServerMessage)) {
+            if (size != sizeof(core::ServerMessage)) {
                 Serial.printf(
                     "Got message from %s (server) with incorrect size (%d) expected (%d)\n",
                     EspNow::toString(mac).data(),
                     size,
-                    sizeof(ServerMessage));
+                    sizeof(core::ServerMessage));
                 return;
             }
 
-            const auto &message = *static_cast<const ServerMessage *>(data);
+            const auto &message = *static_cast<const core::ServerMessage *>(data);
             Serial.print("Server: ");
             Serial.println(message.data());
         }

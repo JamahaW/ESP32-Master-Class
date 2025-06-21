@@ -5,19 +5,19 @@
 #include <Arduino.h>
 #include "WiFi.h"
 
-#include "GyverOLED.h"
+#include "FixOled.h"
 
 
 using game::core::ClientMessage;
 using game::core::ClientMove;
 
-struct OledAdapter : GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> {
+struct OledAdapter : FixOled<SSD1306_128x64, OLED_NO_BUFFER> {
     size_t write(uint8_t data) override {
         if (isEnd()) {
             clear();
             home();
         }
-        return GyverOLED::write(data);
+        return FixOled::write(data);
     }
 };
 

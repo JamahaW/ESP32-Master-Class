@@ -2,11 +2,10 @@
 #include "EspNow.hpp"
 #include <Arduino.h>
 #include <queue>
-#include <map>
-#include <functional>
 #include <esp_wifi.h>
 #include <nvs.h>
 #include <nvs_flash.h>
+#include <map>
 
 /// Логирование операций EspNow
 #define log(__EspNow_api_Result_func) ({auto __r = __EspNow_api_Result_func; Serial.printf(#__EspNow_api_Result_func " -> %s\n", EspNow::toString(__r));})
@@ -28,32 +27,22 @@ struct [[gnu::packed]] PlayerMove {
     Position x, y;
 };
 
-/// Размер доски
-const Position board_size = 8;
-
-/// Отложенное сообщение
-struct ServerReply {
-    EspNow::Mac target;
-    ServerMessage message;
-};
-
-/// Данные пользователя
-struct Player {
-    /// Адрес клиента игрока
-    EspNow::Mac mac;
-    /// Отображаемое имя пользователя
-    PlayerMessage username;
-    /// Номер команды
-    uint8_t team;
-
-    static Player create(const EspNow::Mac &mac, const PlayerMessage &username) {
-        static uint8_t team = 0;
-        team += 1;
-        return {mac, username, team};
-    }
-};
 
 namespace game {
+
+    /// Данные пользователя
+    struct Player {
+        /// Отображаемое имя пользователя
+        PlayerMessage username;
+        /// Номер команды
+        uint8_t team;
+
+        static Player create(const PlayerMessage &username) {
+            static uint8_t team = 0;
+            team += 1;
+            return {username, team};
+        }
+    };
 
     /// Результат действия игры
     enum class MakeMove {
@@ -68,131 +57,187 @@ namespace game {
     Result<MakeMove> makeMove(const Player &player, const PlayerMove &move) {
         return {MakeMove::Ok};
     }
+
+    /// Хост игры
+    struct Host {
+
+        /// Сведения о клиентах
+        std::map<EspNow::Mac, Player> _clients;
+
+        struct SendRecord {
+            EspNow::Mac mac;
+            ServerMessage message;
+        };
+
+        /// Очередь отложенных сообщений
+        std::queue<SendRecord> _sends;
+
+        struct MoveRecord {
+            EspNow::Mac mac;
+            const Player &player;
+            const PlayerMove move;
+        };
+
+        /// Очередь отложенных ходов
+        std::queue<MoveRecord> _moves;
+
+        void init() {
+            auto &esp_now = EspNow::instance();
+
+            auto on_delivery = [](const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
+                game::Host::onDelivery(mac, status);
+            };
+
+            auto on_receive = [this](const EspNow::Mac &mac, const void *data, int size) {
+                this->onReceive(mac, data, size);
+            };
+
+            log(esp_now.setDeliveryHandler(on_delivery));
+            log(esp_now.setReceiveHandler(on_receive));
+        }
+
+        void pull() {
+            if (not _moves.empty()) {
+                auto record = _moves.front();
+
+                auto result = game::makeMove(record.player, record.move); // todo заменить на игру
+
+                if (result.ok()) {
+                    send(record.mac, ServerMessage{"Move Ok"});
+                } else {
+                    send(record.mac, ServerMessage{"Move error"});
+                }
+
+                _moves.pop();
+            }
+
+            if (not _sends.empty()) {
+                auto record = _sends.front();
+
+                if (not EspNow::checkPeerExist(record.mac)) {
+                    log(EspNow::addPeer(record.mac));
+                }
+
+                auto result = EspNow::send(record.mac, record.message);
+
+                Serial.printf("Sending reply to %s .. ", EspNow::toString(record.mac).data());
+
+                if (result.ok()) {
+                    _sends.pop();
+                    Serial.printf("Ok -> %s\n", record.message.data());
+                } else {
+                    Serial.printf("Fail -> %s\n", EspNow::toString(result));
+                }
+            }
+        }
+
+    private:
+
+        // Обработчики сообщений
+
+        void onPlayerMessage(const EspNow::Mac &mac, const PlayerMessage &message) {
+            const auto &it = _clients.find(mac);
+
+            if (it == _clients.end()) {
+                // Игрок ещё не существует - регистрируем
+
+                _clients.emplace(mac, Player::create(message));
+
+                send(mac, formatted<sizeof(ServerMessage)>(
+                    "Client %s registered as '%s'",
+                    EspNow::toString(mac).data(),
+                    message.data()
+                ));
+            } else {
+                // Игрок уже существует - изменяем имя
+
+                auto &player = it->second;
+
+                send(mac, formatted<sizeof(ServerMessage)>(
+                    "Client %s renamed from '%s' to '%s'",
+                    EspNow::toString(mac).data(),
+                    player.username.data(),
+                    message.data()
+                ));
+
+                player.username = message;
+            }
+        }
+
+        void onPlayerMove(const EspNow::Mac &mac, const PlayerMove &move) {
+            const auto &it = _clients.find(mac);
+
+            if (it == _clients.end()) {
+                // Игрок не зарегистрирован - отказ в действии
+
+                send(mac, formatted<sizeof(ServerMessage)>(
+                    "Client %s (Not registered) move denied",
+                    EspNow::toString(mac).data()
+                ));
+
+            } else {
+                // Игрок зарегистрирован - отправляем запись действия в очередь
+
+                auto &player = it->second;
+
+                _moves.push(MoveRecord{mac, player, move});
+
+                send(mac, formatted<sizeof(ServerMessage)>(
+                    "Client %s (Player %s) move send to queue",
+                    EspNow::toString(mac).data(),
+                    player.username.data()
+                ));
+            }
+        }
+
+        void onPlayerUnknown(const EspNow::Mac &mac, int size) {
+            send(mac, formatted<sizeof(ServerMessage)>("Invalid Packed (%d Bytes)", size));
+        }
+
+        // сервис
+
+        /// Добавить сообщение в очередь на отправку
+        void send(const EspNow::Mac &mac, ServerMessage message) {
+            _sends.push(SendRecord{mac, message});
+        }
+
+        // Обработчики событий
+
+        static void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
+            Serial.printf(
+                "Delivery to client %s : %s\n",
+                EspNow::toString(mac).data(),
+                EspNow::toString(status)
+            );
+        }
+
+        void onReceive(const EspNow::Mac &mac, const void *data, int size) {
+            switch (size) {
+                case sizeof(PlayerMessage):
+                    onPlayerMessage(mac, *static_cast<const PlayerMessage *>(data));
+                    return;
+
+                case sizeof(PlayerMove):
+                    onPlayerMove(mac, *static_cast<const PlayerMove *>(data));
+                    return;
+
+                default:
+                    onPlayerUnknown(mac, size);
+            }
+        }
+    };
 }
 
 /// Запуск сервера
-[[noreturn]] void runServer(EspNow &esp_now) {
+[[noreturn]] void runServer() {
+    game::Host host;
 
-    /// Очередь отложенных сообщений
-    static std::queue<ServerReply> sends;
-    /// Сведения о клиентах
-    static std::map<EspNow::Mac, Player> clients;
-    /// Очередь ходов
-    static std::queue<std::pair<std::reference_wrapper<const Player>, PlayerMove>> moves;
+    host.init();
 
-    // Доставка сообщений (К клиенту)
-    auto on_delivery = [](const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
-        Serial.printf("Delivery to client %s : %s\n",
-                      EspNow::toString(mac).data(),
-                      EspNow::toString(status));
-    };
-
-    // Приём сообщений (От клиента)
-    auto on_receive = [](const EspNow::Mac &mac, const void *data, int size) {
-        // Проверка типа сообщения через размер
-        if (size == sizeof(PlayerMessage)) {
-            // Пакет - это сообщение от клиента
-            const auto &new_username = *static_cast<const PlayerMessage *>(data);
-            const auto mac_str = EspNow::toString(mac);
-
-            // Если клиента ещё не существует - регистрируем его, иначе - переименовываем
-            if (clients.find(mac) == clients.end()) {
-                clients.emplace(mac, Player::create(mac, new_username));
-                sends.push(ServerReply{
-                    mac, formatted<sizeof(ServerMessage)>(
-                        "Client %s registered with username: '%s'",
-                        mac_str.data(),
-                        new_username.data()
-                    )
-                });
-            } else {
-                auto &client = clients[mac];
-                sends.push(ServerReply{
-                    mac, formatted<sizeof(ServerMessage)>(
-                        "Client %s was renamed from %s to %s",
-                        mac_str.data(),
-                        client.username.data(),
-                        new_username.data()
-                    )
-                });
-                client.username = new_username;
-            }
-            return;
-        }
-
-        if (size == sizeof(PlayerMove)) {
-            // Пакет - это выполнение хода клиента
-            const auto &move = *static_cast<const PlayerMove *>(data);
-
-            if (clients.find(mac) == clients.end()) {
-                sends.push(ServerReply{
-                    mac, formatted<sizeof(ServerMessage)>(
-                        "Unregistered Client cannot use command"
-                    )
-                });
-            } else {
-                auto &client = clients[mac];
-                moves.emplace(std::ref(client), move);
-            }
-            return;
-        }
-
-        // Тип пакета не определен
-        sends.push(ServerReply{
-            mac, formatted<sizeof(ServerMessage)>(
-                "Invalid Client Package size (%d)",
-                size
-            )
-        });
-    };
-
-    log(esp_now.setDeliveryHandler(on_delivery));
-    log(esp_now.setReceiveHandler(on_receive));
-
-    // Синхронный цикл отправки запланированных сообщений и исполнения ходов
     while (true) {
+        host.pull();
+
         delay(50);
-
-        if (!moves.empty()) {
-            const auto &move = moves.front();
-            const auto &player = move.first.get();
-
-            auto result = game::makeMove(player, move.second);
-
-            if (result.ok()) {
-                sends.push(ServerReply{
-                    player.mac, formatted<sizeof(ServerMessage)>(
-                        "Player move ok"
-                    )
-                });
-            } else {
-                sends.push(ServerReply{
-                    player.mac, formatted<sizeof(ServerMessage)>(
-                        "Move Fail"
-                    )
-                });
-            }
-            moves.pop();
-        }
-
-        if (!sends.empty()) {
-            const auto &reply = sends.front();
-
-            if (not EspNow::checkPeerExist(reply.target)) {
-                log(EspNow::addPeer(reply.target));
-            }
-
-            auto result = EspNow::send(reply.target, reply.message);
-
-            Serial.printf("Sending reply to %s ... ", EspNow::toString(reply.target).data());
-
-            if (result.ok()) {
-                sends.pop();
-                Serial.printf("Ok (%s)\n", reply.message.data());
-            } else {
-                Serial.printf("Fail (%s)\n", EspNow::toString(result));
-            }
-        }
     }
 }
 
@@ -200,27 +245,30 @@ namespace game {
 [[noreturn]] void runClient(EspNow &esp_now) {
     // Доставка сообщений (К серверу)
     auto on_delivery = [](const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
-        Serial.printf("Delivery to server %s : %s\n",
-                      EspNow::toString(mac).data(),
-                      EspNow::toString(status));
+        Serial.printf(
+            "Delivery to server %s : %s\n",
+            EspNow::toString(mac).data(),
+            EspNow::toString(status));
     };
 
     // Приём сообщений (От сервера)
     auto on_receive = [](const EspNow::Mac &mac, const void *data, int size) {
         // Проверка, что сообщение пришло от сервера
         if (mac != server) {
-            Serial.printf("Message (%d Bytes) from %s (not server)\n",
-                          size,
-                          EspNow::toString(mac).data());
+            Serial.printf(
+                "Message (%d Bytes) from %s (not server)\n",
+                size,
+                EspNow::toString(mac).data());
             return;
         }
 
         // Проверка размера пакета
         if (size != sizeof(ServerMessage)) {
-            Serial.printf("Got message from %s (server) with incorrect size (%d) expected (%d)\n",
-                          EspNow::toString(mac).data(),
-                          size,
-                          sizeof(ServerMessage));
+            Serial.printf(
+                "Got message from %s (server) with incorrect size (%d) expected (%d)\n",
+                EspNow::toString(mac).data(),
+                size,
+                sizeof(ServerMessage));
             return;
         }
 
@@ -235,7 +283,7 @@ namespace game {
     log(EspNow::addPeer(server));
 
     PlayerMove move = {123, 69};
-    PlayerMessage message = {"Cool_Client"};
+    PlayerMessage message = {"DarkWoldX17"};
 
     log(EspNow::send(server, message));
 
@@ -275,7 +323,7 @@ void setup() {
     );
 
     if (is_server) {
-        runServer(esp_now);
+        runServer();
     } else {
         runClient(esp_now);
     }

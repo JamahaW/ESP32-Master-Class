@@ -174,7 +174,7 @@ public:
     }
 };
 
-auto joystick = Joystick(32, 33, 1);
+auto joystick = Joystick(32, 33, 0.6);
 
 auto button = Button{15};
 

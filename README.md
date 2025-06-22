@@ -1,49 +1,40 @@
-# Задание 4.3
+# Задание 4.4
 
-## Синхронизация времени по NTP
+## Создание Telegram-бота
 
 ---
 
-### Цель: Научиться получать точное время с NTP-сервера.
+### Цель: Настроить базового Telegram-бота для приема сообщений.
 
 ```cpp
 #include <WiFi.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+#include <FastBot.h>
 
 
 auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
 
-WiFiUDP udp;
+FastBot bot("ТОКЕН_БОТА");
 
-NTPClient timeClient(udp, "pool.ntp.org", 3 * 3600);  // UTC+3
+void handleMessage(FB_msg &msg) {
+    Serial.printf("От %s: %s\n", msg.username, msg.text);
+}
 
 void setup() {
     Serial.begin(115200);
     WiFi.begin(ssid, password);
 
     while (WiFi.status() != WL_CONNECTED) { delay(500); }
-    Serial.println("Connected!");
+    Serial.println("Connected");
 
-    timeClient.begin();
+    bot.attach(handleMessage);
 }
 
-void loop() {
-    timeClient.update();
-    Serial.println(timeClient.getFormattedTime());
-    delay(5000);
-}
+void loop() { bot.tick(); }
 ```
 
-## Пояснения
+## Инструкция по получению токена:
 
-- `pool.ntp.org` - публичный NTP-сервер
-- `3 * 3600` - смещение для часового пояса UTC+3
-
----
-
-```cpp
-client.getFormattedTime()
-```
-
-Возвращает время в формате HH:MM:SS
+- Напишите `@BotFather` в Telegram
+- Используйте команду `/newbot`
+- Следуйте инструкциям для создания бота
+- Скопируйте полученный токен в код

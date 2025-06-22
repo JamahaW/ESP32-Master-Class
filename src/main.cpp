@@ -1,28 +1,25 @@
-// Занятие 4.3 - Синхронизация времени по NTP
+// Занятие 4.4 - Прием сообщений от Telegram-бота
 
 #include <WiFi.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
+#include <FastBot.h>
 
 
 auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
 
-WiFiUDP udp;
+FastBot bot("ТОКЕН_БОТА");
 
-NTPClient timeClient(udp, "pool.ntp.org", 3 * 3600);  // UTC+3
+void handleMessage(FB_msg &msg) {
+    Serial.printf("От %s: %s\n", msg.username, msg.text);
+}
 
 void setup() {
     Serial.begin(115200);
     WiFi.begin(ssid, password);
 
-    while (WL_CONNECTED != WiFi.status()) { delay(500); }
-    Serial.println("Connected!");
+    while (WiFi.status() != WL_CONNECTED) { delay(500); }
+    Serial.println("Connected");
 
-    timeClient.begin();
+    bot.attach(handleMessage);
 }
 
-void loop() {
-    timeClient.update();
-    Serial.println(timeClient.getFormattedTime());
-    delay(5000);
-}
+void loop() { bot.tick(); }

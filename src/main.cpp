@@ -37,16 +37,19 @@ volatile int pot = 0;
     }
 }
 
-// Задача мигания светодиода (Параллельная задача)
+// Задача мигания светодиода (Использует pot для определения частоты мигания)
 [[noreturn]] void blink(void *) {
     const int pin = 13;
     pinMode(pin, OUTPUT);
 
     while (true) {
+        // Вычисляем полупериод пропорционально значению потенциометра
+        int half_period = map(pot, 0, 4095, 50, 500);
+
         digitalWrite(pin, HIGH);
-        delay(500);
+        delay(half_period);
         digitalWrite(pin, LOW);
-        delay(500);
+        delay(half_period);
     }
 }
 

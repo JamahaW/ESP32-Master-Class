@@ -1,54 +1,49 @@
-# Задание 4.2
+# Задание 4.3
 
-## Сканирование Wi-Fi сетей
+## Синхронизация времени по NTP
 
 ---
 
-### Цель: Научиться обнаруживать доступные Wi-Fi сети.
+### Цель: Научиться получать точное время с NTP-сервера.
 
 ```cpp
 #include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
-auto ssid = "ИМЯ_СЕТИ", passphrase = "ПАРОЛЬ_СЕТИ";
+
+auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
+
+WiFiUDP udp;
+
+NTPClient timeClient(udp, "pool.ntp.org", 3 * 3600);  // UTC+3
 
 void setup() {
     Serial.begin(115200);
-    WiFi.begin(ssid, passphrase);
+    WiFi.begin(ssid, password);
 
-    while (WL_CONNECTED != WiFi.status()) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("\nПодключено!");
+    while (WiFi.status() != WL_CONNECTED) { delay(500); }
+    Serial.println("Connected!");
+
+    timeClient.begin();
 }
 
-void loop() {}
+void loop() {
+    timeClient.update();
+    Serial.println(timeClient.getFormattedTime());
+    delay(5000);
+}
 ```
 
-## Теория
+## Пояснения
+
+- `pool.ntp.org` - публичный NTP-сервер
+- `3 * 3600` - смещение для часового пояса UTC+3
 
 ---
 
 ```cpp
-WiFi.scanNetworks() -> int16_t
+client.getFormattedTime()
 ```
 
-Возвращает количество найденных сетей
-
----
-
-```cpp
-WiFi.SSID(uint8_t i) -> String
-```
-
-Возвращает название i-той сети
-
----
-
-```cpp
-WiFi.RSSI(i) -> int32_t
-```
-
-Возвращает уровень сигнала сети
-
----
+Возвращает время в формате HH:MM:SS

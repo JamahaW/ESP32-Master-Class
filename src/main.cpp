@@ -1,16 +1,28 @@
-// Занятие 4.2 - Сканирование доступных Wi-Fi сетей
-#include <WiFi.h>
+// Занятие 4.3 - Синхронизация времени по NTP
 
+#include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+
+auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
+
+WiFiUDP udp;
+
+NTPClient timeClient(udp, "pool.ntp.org", 3 * 3600);  // UTC+3
 
 void setup() {
     Serial.begin(115200);
+    WiFi.begin(ssid, password);
 
-    int n = WiFi.scanNetworks();
-    Serial.printf("Найдено %d сетей:\n", n);
+    while (WL_CONNECTED != WiFi.status()) { delay(500); }
+    Serial.println("Connected!");
 
-    for (int i = 0; i < n; i++) {
-        Serial.printf("%d: %s\n", i + 1, WiFi.SSID(i).c_str());
-    }
+    timeClient.begin();
 }
 
-void loop() {}
+void loop() {
+    timeClient.update();
+    Serial.println(timeClient.getFormattedTime());
+    delay(5000);
+}

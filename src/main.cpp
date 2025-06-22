@@ -1,41 +1,18 @@
-// Занятие 2.3 - Управление двумя кнопками
+// Занятие 2.4 - Сенсорная кнопка
 #include <Arduino.h>
 
-
-// не const чтобы безопасно привести указатель к void *
-auto pin_led_1 = 26, pin_led_2 = 25;
-
-const auto pin_button_1 = 14, pin_button_2 = 13;
-
-
-// Обработчик прерывания с защитой от дребезга
-void IRAM_ATTR button_handler(void *arg) {
-    static decltype(millis()) last = 0;
-    const auto debounce_delay = 100;  // Защита от дребезга (мс)
-
-    // защита от дребезга контактов
-    auto now = millis();
-    if (now - last <= debounce_delay) { return; }
-    last = now;
-
-    // Получение контекста
-    const auto pin_led = *static_cast<uint8_t *>(arg);
-
-    // Инвертирование состояния
-    bool led_state = not digitalRead(pin_led);
-    digitalWrite(pin_led, led_state);
-}
+const auto pin_led = 26, pin_touch = 14;
+const auto threshold = 30;  // Порог срабатывания
 
 void setup() {
-    // Инициализация пинов
-    pinMode(pin_led_1, OUTPUT);
-    pinMode(pin_led_2, OUTPUT);
-    pinMode(pin_button_1, INPUT_PULLUP);
-    pinMode(pin_button_2, INPUT_PULLDOWN);
-
-    // Регистрация прерываний с передачей контекста
-    attachInterruptArg(pin_button_1, button_handler, &pin_led_1, FALLING);
-    attachInterruptArg(pin_button_2, button_handler, &pin_led_2, RISING);
+    pinMode(pin_led, OUTPUT);
 }
 
-void loop() {}  // Основная логика в прерывании
+void loop() {
+    // Чтение значения ёмкостного датчика
+    auto value = touchRead(pin_touch);
+    bool touched = value < threshold;
+
+    digitalWrite(pin_led, touched);  // Управление светодиодом
+    delay(100);
+}

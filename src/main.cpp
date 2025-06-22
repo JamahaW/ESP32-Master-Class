@@ -4,6 +4,7 @@
 
 const int pin_led = 12, pin_button = 32;
 
+// Определяем целевой MAC адрес
 std::array<uint8_t, 6> target_mac = {0xfc, 0xe8, 0xc0, 0x74, 0xa6, 0x30};
 
 // Определяем структуру нашего пакета, используем атрибут gnu::packed для компактной упаковки (без padding)
@@ -51,8 +52,6 @@ void setup() {
     memcpy(peer.peer_addr, target_mac.data(), 6); // Побайтовое копирование
 
     esp_now_add_peer(&peer); // Добавляем peer
-
-
 }
 
 void loop() {

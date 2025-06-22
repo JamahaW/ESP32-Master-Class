@@ -1,52 +1,26 @@
-// Занятие 2.6 - Две сенсорные кнопки
+// Занятие 2.7 - ШИМ через analogWrite
 #include <Arduino.h>
 
 
-const auto pin_led_1 = 26, pin_touch_1 = 14;
+const auto pin_led = 26;
 
-const auto pin_led_2 = 25, pin_touch_2 = 13;
-
-
-// Определяем структуру для передачи нескольких параметров как контекст
-struct Context {
-    // Пин светодиода
-    const int pin_led;
-    // Момент последнего вызова
-    volatile decltype(millis()) last;
-};
-
-// Обработчик прерывания сенсора
-void IRAM_ATTR touchHandler(void *arg) {
-    const auto debounce_delay = 300;  // Увеличенный таймаут для сенсора
-
-    // Получаем контекст
-    auto context = static_cast<Context *>(arg);
-
-    auto now = millis();
-    if (now - context->last <= debounce_delay) { return; }
-    context->last = now;
-
-    bool led_state = not digitalRead(context->pin_led);
-    digitalWrite(context->pin_led, led_state);
-}
+const auto pwm_resolution = 10;  // Разрешение ШИМ (10 бит = 0-1023)
 
 void setup() {
-    const auto threshold = 30;
+    // Настройка параметров ШИМ
+    analogWriteResolution(pwm_resolution);
+    analogWriteFrequency(10000);  // Частота 10 КГц
 
-    pinMode(pin_led_1, OUTPUT);
-    pinMode(pin_led_2, OUTPUT);
-
-    // Создаём контексты
-    static Context context_1 = {
-        .pin_led = pin_led_1,
-        .last = 0
-    };
-
-    static Context context_2 = {pin_led_2, 0};
-
-    // Регистрация обработчиков с передачей контекста
-    touchAttachInterruptArg(pin_touch_1, touchHandler, &context_1, threshold);
-    touchAttachInterruptArg(pin_touch_2, touchHandler, &context_2, threshold);
+    pinMode(pin_led, OUTPUT);
 }
 
-void loop() {}
+void loop() {
+    const auto max_value = (1 << pwm_resolution) - 1;  // Максимальное значение
+
+    // Плавное изменение яркости по треугольной функции
+    for (int i = -max_value; i < max_value; i++) {
+        auto pwm_value = max_value - abs(i);  // Треугольная функция
+        analogWrite(pin_led, pwm_value);
+        delay(1000 / max_value);  // Плавное изменение
+    }
+}

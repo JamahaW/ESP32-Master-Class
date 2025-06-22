@@ -455,7 +455,7 @@ std::vector<int> data = {1, 2, 3};
 <summary><strong>4. Сложные объекты с конструкторами</strong></summary>
 
 ```cpp
-String str = "arduinoString";  // Опасная передача!
+String str = "arduinoString data data data .......... data";  // Опасная передача!
 ```
 
 * Проблема: Внутренняя буферизация и управление памятью
@@ -583,7 +583,7 @@ Foo execute(Command command, Bar bar) {
     auto index = reinterpret_cast<size_t>(command);
     
     if (index >= instructions_count) {
-    // Нет подходящего индекс - это ошибка
+        // Нет подходящего индекс - это ошибка
     }
     
     // получаем инструкцию из таблицы

@@ -63,7 +63,7 @@ graph TD
     esp_err_t result = esp_now_init();
     ```
 
-    <details open>
+    <details>
 
     <summary><strong>Определение</strong> <code>esp_now_init</code></summary>
     Сигнатура:

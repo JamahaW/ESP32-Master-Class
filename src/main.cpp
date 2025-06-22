@@ -1,3 +1,4 @@
+
 #include "game/impl/Client.hpp"
 #include "game/impl/Host.hpp"
 #include "game/core/Protocol.hpp"
@@ -54,7 +55,7 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
     client.sendMessage(ClientMessage{"RandomTron-3000"});
 
     auto rand = []() {
-        return ClientMove::Position(random() & 0b1111);
+        return ClientMove::Value(random() & 0b1111);
     };
 
     while (true) {

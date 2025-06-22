@@ -4,7 +4,10 @@
 namespace lina {
 
     /// Вектор на плоскости
-    struct Vector2D {
-        float x, y;
+    template<typename T> struct Vector2D {
+        /// Тип значения компонента вектора
+        using Value = T;
+
+        T x, y;
     };
 }

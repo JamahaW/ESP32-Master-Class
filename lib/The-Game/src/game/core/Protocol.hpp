@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include "rs/primitives.hpp"
+#include "lina/Vector2D.hpp"
 
 
 namespace game {
@@ -12,11 +14,6 @@ namespace game {
         using ClientMessage = std::array<char, 16>;
 
         /// Тип пакета хода от клиента
-        struct [[gnu::packed]] ClientMove {
-            /// Тип для определения позиции
-            using Position = uint8_t;
-
-            Position x, y;
-        };
+        using ClientMove = lina::Vector2D<rs::u8>;
     }
 }

@@ -2,12 +2,13 @@
 
 #include <array>
 #include <cstdarg>
+#include "rs/primitives.hpp"
 
 
 namespace rs {
 
     /// Получить форматированную строку
-    template<size_t N> std::array<char, N> formatted(const char *format, ...) {
+    template<rs::size N> std::array<char, N> formatted(const char *format, ...) {
         std::array<char, N> buffer{};
 
         va_list args;

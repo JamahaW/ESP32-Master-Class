@@ -1,41 +1,54 @@
-# Задание 2.4: Сенсорная кнопка
+# Задание 2.5: Сенсорная кнопка с прерыванием
 
-## Цель: Освоить использование встроенных ёмкостных датчиков ESP32.
+## Цель: Научиться обрабатывать касания через прерывания.
 
 ```cpp
 const auto pin_led = 26, pin_touch = 14;
-const auto threshold = 30;  // Порог срабатывания
-  
-void setup() {
-    pinMode(pin_led, OUTPUT);
+const auto threshold = 30;
+
+volatile bool led_state = false;
+
+// Обработчик прерывания сенсора
+void IRAM_ATTR touch_handler() {
+    static decltype(millis()) last = 0;
+    const auto debounce_delay = 300;  // Увеличенный таймаут для сенсора
+    
+    auto now = millis();
+    if (now - last <= debounce_delay) { return; }
+    last = now;
+    
+    led_state = not led_state;
+    digitalWrite(pin_led, led_state);
 }
 
-void loop() {
-    // Чтение значения ёмкостного датчика
-    auto value = touchRead(pin_touch);
-    bool touched = value < threshold;
-    
-    digitalWrite(pin_led, touched);  // Управление светодиодом
-    delay(100);
+void setup() {
+    pinMode(pin_led, OUTPUT);
+    // Регистрация прерывания сенсора
+    touchAttachInterrupt(pin_touch, touch_handler, threshold);
 }
+
+void loop() {}
 ```
 
 ## Теория:
 
 ---
 
-> ### Считать значение ёмкостного датчика
-> ```cpp
-> touchRead(uint8_t pin) -> uint16_t
-> ```
-> - меньше значение - сильнее касание
+### Зарегистрировать обработчик для сенсорного ввода
+
+```cpp
+touchAttachInterrupt(
+    uint8_t pin,        // GPIO 
+    void(*handler)(),   // Обработчик как у тактовой кнопки
+    uint16_t threshold  // пороговое значение
+) -> void
+```
 
 ---
 
-### Типичные значения:
+### Особенности:
 
-- Без касания: 50-100
-- При касании: 10-30
+- Более длинный антидребезг из-за природы сенсора
 
 ---
 

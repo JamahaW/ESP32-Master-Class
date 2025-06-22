@@ -333,8 +333,8 @@ esp_now_send(
 ---
 
 Примеры отправки пакета данных `MyPacket`
-* `MyPacket` - это пользовательская структура _(допустим, что определили в скетче)_
 
+* `MyPacket` - это пользовательская структура _(допустим, что определили в скетче)_
 
 <details open>
 <summary><strong>способ <code>C++</code></strong></summary>
@@ -344,9 +344,12 @@ MyPacket packet{ /* Заполняем пакет данными */ };
 
 // Отправляем пакет и получаем статус отправки в очередь сообщений
 esp_err_t result = esp_now_send(
-    target_mac.data(),                      // Получаем сырой указатель на МАС адрес
-    reinterpret_cast<uint8_t *>(&packet),   // Реинтерпретируем указатель данных нашего пакета как сырой указатель 
-    sizeof(MyPacket)                        // Автоматически определяем размер пакета размером структуры
+    // Получаем сырой указатель на МАС адрес
+    target_mac.data(),                      
+    // Реинтерпретируем указатель данных нашего пакета как сырой указатель 
+    reinterpret_cast<uint8_t *>(&packet),   
+    // Автоматически определяем размер пакета размером структуры
+    sizeof(MyPacket)                        
 );
 ```
 
@@ -360,9 +363,12 @@ MyPacket packet = { /* Заполняем пакет данными */ };
 
 // Отправляем пакет и получаем статус отправки в очередь сообщений
 esp_err_t result = esp_now_send(
-    target_mac,                             // Передаём МАС адрес (Он и есть Си-Массив)
-    (uint8_t *)&packet,                     // Преобразуем указатель данных
-    sizeof(MyPacket)                        // Автоматически определяем размер пакета размером структуры
+    // Передаём МАС адрес (Он и есть Си-Массив)
+    target_mac,                             
+    // Преобразуем указатель данных
+    (uint8_t *)&packet,                     
+    // Автоматически определяем размер пакета размером структуры
+    sizeof(MyPacket)                        
 );
 ```
 
@@ -384,7 +390,7 @@ esp_err_t result = esp_now_send(
 | `ESP_ERR_ESPNOW_NOT_INIT`  | ESP NOW не был инициализирован                  |
 | `ESP_ERR_ESPNOW_ARG`       | Неверный аргумент                               |
 | `ESP_ERR_ESPNOW_INTERNAL`  | Внутренняя ошибка                               |
-| `ESP_ERR_ESPNOW_NO_MEM`    | Не хватает памяти  (Можно попытаться потом)     |
+| `ESP_ERR_ESPNOW_NO_MEM`    | Не хватает памяти  (Можно попытаться позже)     |
 | `ESP_ERR_ESPNOW_NOT_FOUND` | Пир не найден (В списке пиров)                  |
 | `ESP_ERR_ESPNOW_IF`        | Текущий интерфейс WiFi не определяет данный пир |
 
@@ -394,9 +400,201 @@ esp_err_t result = esp_now_send(
 
 </blockquote>
 
-
-##              
+## 9. Ограничения на типы данных при отправке по сети
 
 <blockquote>
+
+### По сети некорректно передавать:
+
+<details>
+<summary><strong>1. Динамические указатели</strong></summary>
+
+```cpp
+Foo *message = new Foo();
+
+esp_now_send(mac, (uint8_t*)&message, sizeof(message));
+//                          ^--- Передаём указатель на указатель
+delete foo;
+```
+
+* Проблема: Передается **адрес в памяти**, а не данные
+
+</details>
+
+
+<details>
+<summary><strong>2. Структуры с виртуальными методами</strong></summary>
+
+```cpp
+struct Device {
+    virtual void update() {}  // Виртуальный метод
+};
+```
+
+* Проблема: Содержит скрытый указатель vtable
+* Решение: Использовать **POD**-структуры ()
+
+</details>
+
+
+<details>
+<summary><strong>3. STL-контейнеры динамическим выделением памяти</strong></summary>
+
+```cpp
+std::vector<int> data = {1, 2, 3};
+
+// data хранит данные в heap
+```
+
+* Проблема: Динамическое выделение памяти и автоматическое управление ею
+
+</details>
+
+
+<details>
+<summary><strong>4. Сложные объекты с конструкторами</strong></summary>
+
+```cpp
+String str = "arduinoString";  // Опасная передача!
+```
+
+* Проблема: Внутренняя буферизация и управление памятью
+
+</details>
+
+
+<details>
+<summary><strong>5. Структуры с выравниванием (без packed) и архитектурно зависящими типами</strong></summary>
+
+```cpp
+struct Data {
+    char c;     // 1 байт
+    int i;      // 4 байта на ESP, но 2 байта на AVR
+};              // Размер 8 байт (из-за выравнивания) на ESP, но 3 байта на AVR
+```
+
+* Проблема: Разное расположение данных на разных архитектурах
+* Решение: Использовать атрибуты и типы фиксированного размера:
+
+```cpp
+struct [[gnu::packed]] Data {
+    uint8_t c;  // 1 байт и unsigned (гарантируется поставщиком компилятора)
+    int32_t i;  // 4 байта и signed (гарантируется поставщиком компилятора)
+};              // Размер 1 + 4 байта (минимальный размер) из-за атрибута упаковки
+```
+
+</details>
+
+
+<details>
+<summary><strong>6. Файловые дескрипторы/ресурсы ОС</strong></summary>
+
+```cpp
+fs::File myFile = fs::FS.open("/spiffs/data.txt", "r");
+```
+
+* Проблема: Локальные идентификаторы системы
+* Решение: Передавать только содержимое файлов
+
+</details>
+
+
+<details>
+<summary><strong>7. Указатели на функции</strong></summary>
+
+```cpp
+
+void myFuncToDo_1( ... ) { /* ... */ }
+
+auto fooToDo = &myFuncToDo_1;
+
+```
+
+* Проблема: Адреса функций не имеют смысла на другом устройстве
+* Решение: Передавать ID команд
+
+```cpp
+enum class Command : uint8_t {
+    TouchGrass  = 0,
+    TouchWater,
+    SayHello,
+    SayBye,
+    ...
+    Last // Для общего количества перечислений
+};
+```
+
+Интерпретированное команд
+
+<details>
+<summary><strong>Через switch</strong></summary>
+
+```c
+switch (command) {
+    case Command::TouchGrass:
+        touchGrass();
+        break;
+        
+    case Command::TouchWater:
+        touchWater();
+        break;
+        
+    case Command::SayHello:
+        Serial.println("Hello");
+        break;
+        
+    case Command:SayBye:
+        Serial.println("Bye!");
+        break;
+        
+    // Обязательно проверяйте остальные случаи, получая перечисление по сети!
+    default:
+        Serial.printf("Invalid Opcode: %d", command);
+}
+```
+
+* Недостатки - трудно расширять (Ограничения switch)
+
+</details>
+
+<details>
+<summary><strong>Через таблицу функций</strong></summary>
+
+```cpp
+// Определим вид функции описывающей процедуру
+typedef Foo (*CommandHandler)(Bar);
+
+constexpr auto instructions_count = reinterpret_cast<size_t>(Command::Last);
+
+// Создадим массив инструкций (процедур, функций)
+const std::array<CommandHandler, instructions_count> instruction_table = {
+    // Можно передать как адрес функции, ...
+    touchGrass,
+    touchWater,
+    // ... так и лямбду (без области захвата, т.к. мы используем указатель на функцию)
+    [](Bar){
+    Serial.println("Hello");},
+    [](Bar){
+    Serial.println("Bye");},
+};
+
+Foo execute(Command command, Bar bar) {
+    /// Реинтерпретируем элемент перечисления как индекс в таблице
+    auto index = reinterpret_cast<size_t>(command);
+    
+    if (index >= instructions_count) {
+    // Нет подходящего индекс - это ошибка
+    }
+    
+    // получаем инструкцию из таблицы
+    auto ins = instruction_table.at(index);
+    
+    // Исполняем инструкцию
+    return ins(bar);
+}
+```
+
+</details>
+
 
 </blockquote>

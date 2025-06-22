@@ -1,30 +1,52 @@
-// Занятие 2.5 - Сенсорная кнопка с прерыванием
+// Занятие 2.6 - Две сенсорные кнопки
 #include <Arduino.h>
 
 
-const auto pin_led = 26, pin_touch = 14;
+const auto pin_led_1 = 26, pin_touch_1 = 14;
 
-const auto threshold = 30;
+const auto pin_led_2 = 25, pin_touch_2 = 13;
 
-volatile bool led_state = false;
+
+// Определяем структуру для передачи нескольких параметров как контекст
+struct Context {
+    // Пин светодиода
+    const int pin_led;
+    // Момент последнего вызова
+    volatile decltype(millis()) last;
+};
 
 // Обработчик прерывания сенсора
-void IRAM_ATTR touch_handler() {
-    static decltype(millis()) last = 0;
+void IRAM_ATTR touchHandler(void *arg) {
     const auto debounce_delay = 300;  // Увеличенный таймаут для сенсора
 
-    auto now = millis();
-    if (now - last <= debounce_delay) { return; }
-    last = now;
+    // Получаем контекст
+    auto context = static_cast<Context *>(arg);
 
-    led_state = not led_state;
-    digitalWrite(pin_led, led_state);
+    auto now = millis();
+    if (now - context->last <= debounce_delay) { return; }
+    context->last = now;
+
+    bool led_state = not digitalRead(context->pin_led);
+    digitalWrite(context->pin_led, led_state);
 }
 
 void setup() {
-    pinMode(pin_led, OUTPUT);
-    // Регистрация прерывания сенсора
-    touchAttachInterrupt(pin_touch, touch_handler, threshold);
+    const auto threshold = 30;
+
+    pinMode(pin_led_1, OUTPUT);
+    pinMode(pin_led_2, OUTPUT);
+
+    // Создаём контексты
+    static Context context_1 = {
+        .pin_led = pin_led_1,
+        .last = 0
+    };
+
+    static Context context_2 = {pin_led_2, 0};
+
+    // Регистрация обработчиков с передачей контекста
+    touchAttachInterruptArg(pin_touch_1, touchHandler, &context_1, threshold);
+    touchAttachInterruptArg(pin_touch_2, touchHandler, &context_2, threshold);
 }
 
 void loop() {}

@@ -9,7 +9,7 @@
 #include <esp_mac.h>
 
 #include "rs/Result.hpp"
-#include "rs/Utils.hpp"
+#include "rs/ArrayString.hpp"
 #include "rs/primitives.hpp"
 
 

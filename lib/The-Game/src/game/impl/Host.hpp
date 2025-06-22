@@ -9,7 +9,7 @@
 #include <map>
 #include <queue>
 
-#include "rs/Utils.hpp"
+#include "rs/ArrayString.hpp"
 
 
 namespace game {

@@ -1,28 +1,28 @@
-# Задание 2.7: ШИМ через analogWrite
+# Задание 2.8: ШИМ через ledcWrite
 
-## Цель: Освоить базовое управление ШИМ на ESP32.
+## Цель: Освоить продвинутое управление ШИМ с помощью LEDC.
 
 ```cpp
 const auto pin_led = 26;
 
-const auto pwm_resolution = 10;  // Разрешение ШИМ (10 бит = 0-1023)
+const auto pwm_channel = 0;       // Канал ШИМ (0-15)
+const auto pwm_frequency = 5000;  // Частота 5 КГц
+const auto pwm_resolution = 8;    // Разрешение 8 бит
 
 void setup() {
-    pinMode(pin_led, OUTPUT);
-    
-    // Настройка параметров ШИМ
-    analogWriteResolution(pwm_resolution);
-    analogWriteFrequency(10000);  // Частота 10 КГц
+    // Настройка канала ШИМ
+    ledcSetup(pwm_channel, pwm_frequency, pwm_resolution);
+    ledcAttachPin(pin_led, pwm_channel);  // Привязка пина к каналу
 }
 
 void loop() {
-    const auto max_value = (1 << pwm_resolution) - 1;  // Максимальное значение
-    
-    // Плавное изменение яркости по треугольной функции
+    const auto max_value = (1 << pwm_resolution) - 1;
+
+    // Плавное изменение яркости
     for (int i = -max_value; i < max_value; i++) {
-        auto pwm_value = max_value - abs(i);  // Треугольная функция
-        analogWrite(pin_led, pwm_value);
-        delay(1000 / max_value);  // Плавное изменение
+        auto pwm_value = max_value - abs(i);
+        ledcWrite(pwm_channel, pwm_value);  // Управление через LEDC
+        delay(1000 / max_value);
     }
 }
 ```
@@ -31,28 +31,25 @@ void loop() {
 
 ---
 
-### Устанавливает значение ШИМ на пине
+### Настраивает канал ШИМ
 ```cpp
-analogWrite(
-    uint8_t pin,    // GPIO
-    uint32_t value  // Значение заполнения
+ledcSetup(
+    uint8_t channel,            // Номер канала (0..15)
+    uint32_t freq,              // Частота в Гц
+    uint8_t resolution_bits     // Разрешение (1..20 бит)
 ) -> void
 ```
 
 ---
 
-### Устанавливает разрешение ШИМ
+### Привязывает пин к каналу ШИМ
 ```cpp
-analogWriteResolution(
-    uint8_t bits // (8..16 бит)
-) -> void
+ledcAttachPin(uint8_t pin, uint8_t channel) -> void
 ```
 
 ---
 
-### Устанавливает частоту ШИМ
+### Устанавливает коэффициент заполнения для канала
 ```cpp
-analogWriteFrequency(
-    uint32_t freq // в Гц
-) -> void
+ledcWrite(uint8_t channel, uint32_t duty) -> void
 ```

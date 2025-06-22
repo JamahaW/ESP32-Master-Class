@@ -183,7 +183,7 @@ uint32_t rx_state;              // Состояние приема
 
 <details>
 
-<summary><strong>Устаревшее API</strong><code>ESP-IDF < 2.0</code></summary>
+<summary><strong>Устаревшее API</strong> <code>ESP-IDF < 2.0</code></summary>
 
 ```c
 void onReceive(
@@ -272,6 +272,7 @@ memcpy(peer.peer_addr, target_mac, sizeof(peer.peer_addr));
 - Имеет адрес `FF-FF-FF-FF-FF-FF`
 - Не должен иметь шифрования (`esp_now_peer_info_t::encrypt = false`)
 - Действует в рамках одного канала (`esp_now_peer_info_t::channel`)
+- При результате `ESP_OK` `esp_now_send` обработчик доставки примёт статус `esp_now_send_status_t::ESP_NOW_SEND_FAIL`
 
 ---
 

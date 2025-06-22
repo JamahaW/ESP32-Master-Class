@@ -12,13 +12,17 @@ struct Button {
     bool read() const { return not digitalRead(pin); }
 };
 
-struct Vector2D { float x, y; };
+/// Вектор на плоскости
+struct Vector2D {
+    float x, y;
+};
 
+/// Экспоненциальный фильтр
 template<typename T> struct ExponentialFilter {
-    const float k;
+    float k;
     T filtered;
 
-    constexpr explicit ExponentialFilter(float k, T &&init_value) :
+    constexpr explicit ExponentialFilter(const float &k, T &&init_value = 0) :
         k{k}, filtered{init_value} {}
 
     const T &calc(T value) {
@@ -27,70 +31,115 @@ template<typename T> struct ExponentialFilter {
     }
 };
 
-struct Joystick {
-    using TimeMs = uint32_t;
+#include <array>
+#include <algorithm>
 
-    struct JoystickAxis {
-        static constexpr int max_value = 4095;
-        static constexpr auto default_center = max_value / 2;
 
-        const u8 pin;
-        float center;
-        float center_max;
-        ExponentialFilter<float> filter;
+/// Медианный фильтр с буфером произвольного нечётного размера (2*N+1)
+template<typename T, size_t N> struct MedianFilter {
+    static_assert(N % 2 == 1, "MedianFilter requires odd buffer size (2*K+1)");
 
-        static constexpr JoystickAxis create(u8 pin) {
-            return {
-                .pin = pin,
-                .center = default_center,
-                .center_max = default_center,
-                .filter = ExponentialFilter<float>(0.3f, default_center),
-            };
-        }
+private:
 
-        void updateCenter(int new_center) {
-            center = float(new_center);
-            center_max = max_value - center;
-        }
+    std::array<T, N> buffer{};
+    size_t next_index{0};
 
-        void init() const { pinMode(pin, INPUT); }
+public:
 
-        int readRaw() const { return analogRead(pin); }
-
-        float readNormalized() {
-            const auto value = filter.calc(float(readRaw()) - center);
-
-            if (value < 0) {
-                return value / center;
-            } else {
-                return value / center_max;
-            }
-        }
-
-        JoystickAxis() = delete;
-    };
-
-    struct Value {
-        Vector2D axis;
-        float power;
-    };
-
-    JoystickAxis axis_x, axis_y;
-
-    static constexpr Joystick create(u8 pin_x, u8 pin_y) {
-        return {
-            .axis_x = JoystickAxis::create(pin_x),
-            .axis_y = JoystickAxis::create(pin_y),
-        };
+    explicit MedianFilter(T init_value = 0) {
+        buffer.fill(init_value);
     }
 
+    /// Рассчитать медиану
+    const T &calc(T &&value) {
+        buffer[next_index] = value;
+        next_index = (next_index + 1) % N;
+
+        auto sorted = buffer;
+        auto middle = sorted.begin() + N / 2;
+
+        std::nth_element(sorted.begin(), middle, sorted.end());
+
+        return *middle;
+    }
+};
+
+/// Джойстик с двумя осями
+struct Joystick {
+
+private:
+
+    /// Джойстик с одной осью
+    struct JoystickAxis {
+
+    private:
+
+        /// Максимальное аналоговое значение
+        static constexpr auto max_analog_value = 4095;
+        /// Аналоговый центр по умолчанию (Среднее значение)
+        static constexpr auto default_analog_center = max_analog_value / 2;
+
+        /// Пин подключения джойстика
+        const u8 pin;
+        /// Внешний фильтр значений
+        ExponentialFilter<float> outer_filter;
+        /// Внутренний фильтр аналоговых значений
+        MedianFilter<int, 5> inner_filter{default_analog_center};
+        /// Граница от центра на уменьшение
+        float generic_edge{default_analog_center};
+        /// Граница от центра на возрастание
+        float positive_edge{default_analog_center};
+
+    public:
+
+        explicit JoystickAxis(u8 pin, const float &k) :
+            pin{pin}, outer_filter{k} {}
+
+        /// Инициализировать джойстик
+        inline void init() const { pinMode(pin, INPUT); }
+
+        /// Обновить значение аналогового цента
+        void updateCenter(int new_center) {
+            generic_edge = float(new_center);
+            positive_edge = max_analog_value - generic_edge;
+        }
+
+        /// Считать (сырое) аналоговое значение
+        inline int readRaw() const { return analogRead(pin); }
+
+        /// Считать нормализованное значение
+        float read() {
+            const auto raw = inner_filter.calc(readRaw());
+            const auto value = outer_filter.calc(float(raw) - generic_edge);
+
+            if (value < 0) {
+                return value / generic_edge;
+            } else {
+                return value / positive_edge;
+            }
+        }
+    };
+
+    /// Ось джойстика X
+    JoystickAxis axis_x;
+    /// Ось джойстика Y
+    JoystickAxis axis_y;
+
+public:
+
+    explicit Joystick(u8 pin_x, u8 pin_y, float &&filter_k) :
+        axis_x{pin_x, filter_k},
+        axis_y{pin_y, filter_k} {}
+
+    /// Инициализировать джойстик
     void init() const {
         axis_x.init();
         axis_y.init();
     }
 
+    /// выполнить калибровку центра джойстика
     void calibrate(int iterations) {
-        constexpr TimeMs period = 10;
+        constexpr auto period = 10;
 
         int sum_x = 0;
         int sum_y = 0;
@@ -105,22 +154,27 @@ struct Joystick {
         axis_y.updateCenter(sum_y / iterations);
     }
 
+    /// Возвращаемое значение джойстика
+    struct Value {
+        /// Нормализованное значение по двум осям
+        Vector2D axis;
+        /// Вычисленная магнитуда по двум осям
+        float magnitude;
+    };
+
+    /// Считать значение джойстика
     Value read() {
-        const auto x = axis_x.readNormalized();
-        const auto y = axis_y.readNormalized();
+        const auto x = axis_x.read();
+        const auto y = axis_y.read();
         const auto h = std::hypot(x, y);
 
         if (h < 0.01) { return {{0, 0}, 0}; }
-
         if (h > 1) { return {{x / h, y / h}, 1}; }
-
         return {{x, y}, h};
     }
-
-    Joystick() = delete;
 };
 
-auto joystick = Joystick::create(32, 33);
+auto joystick = Joystick(32, 33, 1);
 
 auto button = Button{15};
 
@@ -149,7 +203,7 @@ void loop() {
         screen.printf("y %.3f", v.axis.y);
 
         screen.setCursor(0, 2);
-        screen.printf("p %.3f", v.power);
+        screen.printf("p %.3f", v.magnitude);
 
         screen.setCursor(0, 3);
         screen.printf("b %s", b ? "high" : "low");

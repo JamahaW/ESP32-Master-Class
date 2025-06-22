@@ -17,9 +17,11 @@ struct [[gnu::packed]] Packet {
 
 // Обработчик приёма данных
 void onReceive(const uint8_t *mac, const uint8_t *data, int size) {
+    // Интерпретация данных как пакета
     const auto &packet = *reinterpret_cast<const Packet *>(data);
+
     digitalWrite(pin_led, packet.led_state);
-    Serial.println(packet.send_time_ms);
+    Serial.printf("%u -> %s", packet.send_time_ms, packet.led_state ? "HIGH" : "LOW");
 }
 
 // Обработчик на доставку данных

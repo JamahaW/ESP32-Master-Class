@@ -610,7 +610,7 @@ switch (command) {
         Serial.println("Hello");
         break;
         
-    case Command:SayBye:
+    case Command::SayBye:
         Serial.println("Bye!");
         break;
         
@@ -636,29 +636,29 @@ constexpr auto instructions_count = reinterpret_cast<size_t>(Command::Last);
 
 // Создадим массив инструкций (процедур, функций)
 const std::array<CommandHandler, instructions_count> instruction_table = {
-// Можно передать как адрес функции, ...
-touchGrass,
-touchWater,
-// ... так и лямбду (без области захвата, т.к. мы используем указатель на функцию)
-[](Bar){
-Serial.println("Hello");},
-[](Bar){
-Serial.println("Bye");},
+   // Можно передать как адрес функции, ...
+   touchGrass,
+   touchWater,
+   // ... так и лямбду (без области захвата, т.к. мы используем указатель на функцию)
+   [](Bar){
+   Serial.println("Hello");},
+   [](Bar){
+   Serial.println("Bye");},
 };
 
 Foo execute(Command command, Bar bar) {
-/// Реинтерпретируем элемент перечисления как индекс в таблице
-auto index = reinterpret_cast<size_t>(command);
-
-if (index >= instructions_count) {
-// Нет подходящего индекс - это ошибка
-}
-
-// получаем инструкцию из таблицы
-auto ins = instruction_table.at(index);
-
-// Исполняем инструкцию
-return ins(bar);
+   /// Реинтерпретируем элемент перечисления как индекс в таблице
+   auto index = reinterpret_cast<size_t>(command);
+   
+   if (index >= instructions_count) {
+        // Нет подходящего индекс - это ошибка
+   }
+   
+   // получаем инструкцию из таблицы
+   auto ins = instruction_table.at(index);
+   
+   // Исполняем инструкцию
+   return ins(bar);
 }
 ```
 

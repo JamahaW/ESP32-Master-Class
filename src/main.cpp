@@ -1,3 +1,4 @@
+#include "rs/primitives.hpp"
 #include "game/impl/Client.hpp"
 #include "game/impl/Host.hpp"
 #include "game/core/Protocol.hpp"

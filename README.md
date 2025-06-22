@@ -1,27 +1,34 @@
-# Задание 4.5
+# Задание 4.6
 
-## Эхо-бот в Telegram
+## Вывод сообщений Telegram на OLED
 
 ---
 
-### Цель: Создать бота, отвечающего на сообщения.
+### Цель: Интегрировать OLED дисплей для отображения сообщений.
 
 ```cpp
 #include <WiFi.h>
 #include <FastBot.h>
+#include <GyverOLED.h>
+
+GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> oled;
 
 auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
 
 FastBot bot("ТОКЕН_БОТА");
 
 void handleMessage(FB_msg &msg) {
-    bot.sendMessage(msg.text, msg.chatID);
+    oled.clear();
+    oled.setCursor(0, 0);
+    oled.print(msg.text);
 }
 
 void setup() {
     Serial.begin(115200);
-    WiFi.begin(ssid, password);
+    oled.init();
+    oled.autoPrintln(true);
 
+    WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) { delay(500); }
     Serial.println("Connected");
 

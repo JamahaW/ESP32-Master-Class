@@ -1,20 +1,31 @@
-// Занятие 2.1 - Базовое управление кнопкой
+// Занятие 2.2 - Обработка кнопки прерыванием
 #include <Arduino.h>
 
 
-// Определение пинов: светодиод и кнопка
 const auto pin_led = 26, pin_button = 14;
 
+volatile bool led_state = false;  // Состояние светодиода (изменяется в прерывании)
+
+// Обработчик прерывания с защитой от дребезга
+void IRAM_ATTR button_handler() {
+    static decltype(millis()) last = 0;
+    const auto debounce_delay = 100;  // Защита от дребезга (мс)
+
+    // защита от дребезга контактов
+    auto now = millis();
+    if (now - last <= debounce_delay) { return; }
+    last = now;
+
+    led_state = not led_state;  // Инвертирование состояния
+    digitalWrite(pin_led, led_state);
+}
+
 void setup() {
-    // Настройка режимов пинов
     pinMode(pin_led, OUTPUT);
-    pinMode(pin_button, INPUT_PULLUP);  // Используем встроенную подтяжку к VCC
+    pinMode(pin_button, INPUT_PULLUP);
+
+    // Регистрация прерывания на FALLING фронт
+    attachInterrupt(pin_button, button_handler, FALLING);
 }
 
-void loop() {
-    // Чтение состояния кнопки и управление светодиодом
-    bool button_state = digitalRead(pin_button);
-    digitalWrite(pin_led, button_state);
-
-    delay(100);
-}
+void loop() {}  // Основная логика в прерывании

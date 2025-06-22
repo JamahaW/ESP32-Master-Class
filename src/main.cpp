@@ -8,7 +8,7 @@ void setup() {
     Serial.begin(115200);
     WiFi.begin(ssid, passphrase);
 
-    while (WiFi.status() != WL_CONNECTED) {
+    while (WL_CONNECTED != WiFi.status()) {
         delay(500);
         Serial.print(".");
     }

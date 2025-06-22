@@ -32,18 +32,83 @@
 
 </blockquote>
 
-## 3. Структуры данных
+## 3. Инициализация ESP-NOW
 
 <blockquote>
 
-```cpp
-struct [[gnu::packed]] MyPacket {
-    // Определение полей пакета
-};
+<details open>
+<summary><strong>Диаграмма вызовов API</strong></summary>
+
+```mermaid
+graph TD
+    A[WIFI_STA] --> B[esp_now_init]
+    B --> C[esp_now_register_recv_cb]
+    B --> D[esp_now_register_send_cb]
+    B --> E[esp_now_add_peer]
 ```
 
-- Определить пакет как структуру - самый универсальный способ
-- Атрибут `[[gnu::packed]]` гарантирует **минимальный размер** структуры **(без выравнивания)**
+</details>
+
+---
+
+1. **Включить режим `STA` (Режим станции)**
+
+    ```cpp
+    WiFi.mode(WIFI_STA);
+    ```
+
+2. **Инициализировать протокол `ESP NOW`**
+
+    ```c
+    esp_err_t result = esp_now_init();
+    ```
+
+    <details open>
+
+    <summary><strong>Определение</strong> <code>esp_now_init</code></summary>
+    Сигнатура:
+
+    ```c
+    esp_now_init() -> esp_err_t;
+    ```
+
+    <details>
+    <summary><strong>Варианты</strong> <code>esp_err_t</code></summary>
+
+    - `ESP_OK` - Успешно добавлен
+    - `ESP_ERR_ESPNOW_INTERNAL` - Внутренняя ошибка API `ESP NOW`
+
+    </details>
+
+    </details>
+
+3. **Зарегистрировать обработчики приёма и отправки сообщений**
+
+   <details>
+   <summary><strong>Определение</strong> <code>esp_now_register_recv_cb</code> и <code>esp_now_register_send_cb</code></summary>
+
+   ```c
+    esp_now_register_recv_cb(
+        esp_now_recv_cb_t cb    // Обработчик
+    ) -> esp_err_t              // Результат регистрации
+   ```
+
+   ```c
+    esp_now_register_send_cb(
+        esp_now_send_cb_t cb    // Обработчик
+    ) -> esp_err_t              // Результат регистрации
+   ```
+
+   <details>
+    <summary><strong>Варианты</strong> <code>esp_err_t</code></summary>
+
+    - `ESP_OK` - Успешно добавлен
+    - `ESP_ERR_ESPNOW_NOT_INIT` - `ESP NOW` не был инициализирован
+    - `ESP_ERR_ESPNOW_INTERNAL` - Внутренняя ошибка API `ESP NOW`
+
+   </details>
+
+   </details>
 
 </blockquote>
 
@@ -156,21 +221,7 @@ typedef enum {
 
 </blockquote>
 
-## 5. Инициализация ESP-NOW
-
-<blockquote>
-
-```mermaid
-graph TD
-    A[WIFI_STA] --> B[esp_now_init]
-    B --> C[esp_now_register_recv_cb]
-    B --> D[esp_now_register_send_cb]
-    B --> E[esp_now_add_peer]
-```
-
-</blockquote>
-
-## 6. Создание пира
+## 5. Создание пира
 
 <blockquote>
 
@@ -279,7 +330,7 @@ typedef struct esp_now_peer_info_t {
 
 </blockquote>
 
-## 7. Добавление пира
+## 6. Добавление пира
 
 <blockquote>
 
@@ -300,19 +351,34 @@ esp_now_add_peer(
 
 <div align="center">
 
-| Тип результата            | Значение                       |
-|---------------------------|--------------------------------|
-| `ESP_OK`                  | Успешно добавлен               |
-| `ESP_ERR_ESPNOW_NOT_INIT` | ESP NOW не был инициализирован |
-| `ESP_ERR_ESPNOW_ARG`      | Неверный аргумент              |
-| `ESP_ERR_ESPNOW_FULL`     | Список пиров полон             |
-| `ESP_ERR_ESPNOW_NO_MEM`   | Не хватает памяти              |
-| `ESP_ERR_ESPNOW_EXIST`    | Пир уже добавлен               |
+| Тип результата            | Значение                         |
+|---------------------------|----------------------------------|
+| `ESP_OK`                  | Успешно добавлен                 |
+| `ESP_ERR_ESPNOW_NOT_INIT` | `ESP NOW` не был инициализирован |
+| `ESP_ERR_ESPNOW_ARG`      | Неверный аргумент                |
+| `ESP_ERR_ESPNOW_FULL`     | Список пиров полон               |
+| `ESP_ERR_ESPNOW_NO_MEM`   | Не хватает памяти                |
+| `ESP_ERR_ESPNOW_EXIST`    | Пир уже добавлен                 |
 
 </div>
 
 </details>
 
+
+</blockquote>
+
+## 7. Структуры данных
+
+<blockquote>
+
+```cpp
+struct [[gnu::packed]] MyPacket {
+    // Определение полей пакета
+};
+```
+
+- Определить пакет как структуру - самый универсальный способ
+- Атрибут `[[gnu::packed]]` гарантирует **минимальный размер** структуры **(без выравнивания)**
 
 </blockquote>
 
@@ -387,7 +453,7 @@ esp_err_t result = esp_now_send(
 | Тип результата             | Значение                                        |
 |----------------------------|-------------------------------------------------|
 | `ESP_OK`                   | Успешно добавлен                                |
-| `ESP_ERR_ESPNOW_NOT_INIT`  | ESP NOW не был инициализирован                  |
+| `ESP_ERR_ESPNOW_NOT_INIT`  | `ESP NOW` не был инициализирован                |
 | `ESP_ERR_ESPNOW_ARG`       | Неверный аргумент                               |
 | `ESP_ERR_ESPNOW_INTERNAL`  | Внутренняя ошибка                               |
 | `ESP_ERR_ESPNOW_NO_MEM`    | Не хватает памяти  (Можно попытаться позже)     |
@@ -558,6 +624,7 @@ switch (command) {
 </details>
 
 <details>
+
 <summary><strong>Через таблицу функций</strong></summary>
 
 ```cpp
@@ -568,29 +635,29 @@ constexpr auto instructions_count = reinterpret_cast<size_t>(Command::Last);
 
 // Создадим массив инструкций (процедур, функций)
 const std::array<CommandHandler, instructions_count> instruction_table = {
-    // Можно передать как адрес функции, ...
-    touchGrass,
-    touchWater,
-    // ... так и лямбду (без области захвата, т.к. мы используем указатель на функцию)
-    [](Bar){
-    Serial.println("Hello");},
-    [](Bar){
-    Serial.println("Bye");},
+// Можно передать как адрес функции, ...
+touchGrass,
+touchWater,
+// ... так и лямбду (без области захвата, т.к. мы используем указатель на функцию)
+[](Bar){
+Serial.println("Hello");},
+[](Bar){
+Serial.println("Bye");},
 };
 
 Foo execute(Command command, Bar bar) {
-    /// Реинтерпретируем элемент перечисления как индекс в таблице
-    auto index = reinterpret_cast<size_t>(command);
-    
-    if (index >= instructions_count) {
-        // Нет подходящего индекс - это ошибка
-    }
-    
-    // получаем инструкцию из таблицы
-    auto ins = instruction_table.at(index);
-    
-    // Исполняем инструкцию
-    return ins(bar);
+/// Реинтерпретируем элемент перечисления как индекс в таблице
+auto index = reinterpret_cast<size_t>(command);
+
+if (index >= instructions_count) {
+// Нет подходящего индекс - это ошибка
+}
+
+// получаем инструкцию из таблицы
+auto ins = instruction_table.at(index);
+
+// Исполняем инструкцию
+return ins(bar);
 }
 ```
 

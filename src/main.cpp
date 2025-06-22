@@ -55,7 +55,8 @@ void setup() {
 
     // Добавляем пир - структура, важно peer_addr,
     esp_now_peer_info_t peer = {};
-    memcpy(peer.peer_addr, target_mac.data(), 6); // Побайтовое копирование
+    std::copy(target_mac.begin(), target_mac.end(), peer.peer_addr);
+//    memcpy(peer.peer_addr, target_mac.data(), sizeof(peer.peer_addr)); // Побайтовое копирование
 
     ESP_ERROR_CHECK(esp_now_add_peer(&peer)); // Добавляем peer
 }

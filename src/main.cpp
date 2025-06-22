@@ -28,10 +28,20 @@ volatile bool oled_enabled = true;
 
 // Задача дисплея (Использует pot, обновляет дисплей с частотой 10 Гц)
 [[noreturn]] void oledUpdate(void *) {
+    // Предыдущее значение питания
+    bool oled_last_enabled = oled_enabled;
+
     oled.init();
     oled.setScale(2);
 
     while (true) {
+
+        // Если значение изменилось с прошлого раза, то обновляем и запоминаем
+        if (oled_enabled != oled_last_enabled) {
+            oled_last_enabled = oled_enabled;
+            oled.setPower(oled_enabled);
+        }
+
         if (oled_enabled) {
             oled.clear();
             oled.setCursor(0, 0);

@@ -1,22 +1,21 @@
-# Задание 4.4
+# Задание 4.5
 
-## Создание Telegram-бота
+## Эхо-бот в Telegram
 
 ---
 
-### Цель: Настроить базового Telegram-бота для приема сообщений.
+### Цель: Создать бота, отвечающего на сообщения.
 
 ```cpp
 #include <WiFi.h>
 #include <FastBot.h>
-
 
 auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
 
 FastBot bot("ТОКЕН_БОТА");
 
 void handleMessage(FB_msg &msg) {
-    Serial.printf("От %s: %s\n", msg.username, msg.text);
+    bot.sendMessage(msg.text, msg.chatID);
 }
 
 void setup() {
@@ -32,9 +31,6 @@ void setup() {
 void loop() { bot.tick(); }
 ```
 
-## Инструкция по получению токена:
-
-- Напишите `@BotFather` в Telegram
-- Используйте команду `/newbot`
-- Следуйте инструкциям для создания бота
-- Скопируйте полученный токен в код
+## Особенности:
+- Бот отвечает тем же текстом, что прислал пользователь
+- `message.chatID` содержит идентификатор чата

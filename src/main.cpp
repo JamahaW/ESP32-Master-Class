@@ -1,4 +1,4 @@
-// Занятие 4.4 - Прием сообщений от Telegram-бота
+// Занятие 4.5 - Создание эхо-бота в Telegram
 
 #include <WiFi.h>
 #include <FastBot.h>
@@ -9,7 +9,7 @@ auto ssid = "ИМЯ_СЕТИ", password = "ПАРОЛЬ_СЕТИ";
 FastBot bot("ТОКЕН_БОТА");
 
 void handleMessage(FB_msg &msg) {
-    Serial.printf("От %s: %s\n", msg.username, msg.text);
+    bot.sendMessage(msg.text, msg.chatID);
 }
 
 void setup() {

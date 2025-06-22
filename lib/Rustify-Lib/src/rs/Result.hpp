@@ -2,7 +2,7 @@
 
 namespace rs {
 
-/// Result тип на основе перечисления
+    /// Result тип на основе перечисления
     template<typename E> struct Result {
 
         /// значение

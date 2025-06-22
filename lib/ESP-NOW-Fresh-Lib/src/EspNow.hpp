@@ -10,6 +10,7 @@
 
 #include "rs/Result.hpp"
 #include "rs/Utils.hpp"
+#include "rs/primitives.hpp"
 
 
 #define return_case(__v) case __v: return #__v;
@@ -21,12 +22,8 @@ static constexpr char mac_format_string[] = "[%02X:%02X:%02X:%02X:%02X:%02X]";
 struct EspNow {
     using MacString = std::array<char, sizeof(mac_format_string)>;
 
-    using u8 = uint8_t;
-    using str = const char *;
-
     /// Безопасный тип для MAC адреса
-    using Mac = std::array<u8, ESP_NOW_ETH_ALEN>;
-
+    using Mac = std::array<rs::u8, ESP_NOW_ETH_ALEN>;
 
     /// Статус доставки
     enum class DeliveryStatus {
@@ -198,7 +195,7 @@ struct EspNow {
         return {
             translateSend(esp_now_send(
                 mac.data(),
-                reinterpret_cast<const u8 *>(&value),
+                reinterpret_cast<const rs::u8 *>(&value),
                 sizeof(T)
             ))
         };
@@ -206,7 +203,7 @@ struct EspNow {
 
 private:
 
-    static void onReceive(const u8 *mac, const u8 *data, int size) {
+    static void onReceive(const rs::u8 *mac, const rs::u8 *data, int size) {
         instance()._on_receive(
             castMac(mac),
             static_cast<const void *>(data),
@@ -214,14 +211,14 @@ private:
         );
     }
 
-    static void onDelivery(const u8 *mac, esp_now_send_status_t status) {
+    static void onDelivery(const rs::u8 *mac, esp_now_send_status_t status) {
         instance()._on_delivery(
             castMac(mac),
             translateDeliveryStatus(status)
         );
     }
 
-    inline static const Mac &castMac(const u8 *mac) {
+    inline static const Mac &castMac(const rs::u8 *mac) {
         return *reinterpret_cast<const Mac *>(mac);
     }
 
@@ -331,7 +328,7 @@ public:
 
     // toString
 
-    template<typename E> static str toString(const rs::Result<E> &result) {
+    template<typename E> static rs::str toString(const rs::Result<E> &result) {
         return toString(result.value);
     }
 
@@ -340,7 +337,7 @@ public:
         return rs::formatted<sizeof(mac_format_string)>(mac_format_string, raw[0], raw[1], raw[2], raw[3], raw[4], raw[5]);
     }
 
-    static str toString(SetHandler value) {
+    static rs::str toString(SetHandler value) {
         switch (value) {
             return_case(SetHandler::Ok)
             return_case(SetHandler::NotInit)
@@ -350,7 +347,7 @@ public:
         }
     }
 
-    static str toString(DeliveryStatus status) {
+    static rs::str toString(DeliveryStatus status) {
         switch (status) {
             return_case(DeliveryStatus::Ok)
             return_case(DeliveryStatus::Fail)
@@ -358,7 +355,7 @@ public:
         }
     }
 
-    static str toString(Init value) {
+    static rs::str toString(Init value) {
         switch (value) {
             return_case(Init::Ok)
             return_case(Init::InternalError)
@@ -367,7 +364,7 @@ public:
         }
     }
 
-    static str toString(PeerAdd value) {
+    static rs::str toString(PeerAdd value) {
         switch (value) {
             return_case(PeerAdd::Ok)
             return_case(PeerAdd::NotInit)
@@ -380,7 +377,7 @@ public:
         }
     }
 
-    static str toString(PeerDelete value) {
+    static rs::str toString(PeerDelete value) {
         switch (value) {
             return_case(PeerDelete::Ok)
             return_case(PeerDelete::NotInit)
@@ -391,7 +388,7 @@ public:
         }
     }
 
-    static str toString(Send value) {
+    static rs::str toString(Send value) {
         switch (value) {
             return_case(Send::Ok)
             return_case(Send::NotInit)

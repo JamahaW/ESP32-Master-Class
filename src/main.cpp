@@ -1,4 +1,3 @@
-#include "rs/primitives.hpp"
 #include "game/impl/Client.hpp"
 #include "game/impl/Host.hpp"
 #include "game/core/Protocol.hpp"
@@ -11,16 +10,6 @@
 
 using game::core::ClientMessage;
 using game::core::ClientMove;
-
-struct OledAdapter : FixOled<SSD1306_128x64, OLED_NO_BUFFER> {
-    size_t write(uint8_t data) override {
-        if (isEnd()) {
-            clear();
-            home();
-        }
-        return FixOled::write(data);
-    }
-};
 
 
 /// Адрес сервера
@@ -44,6 +33,17 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 
 /// Запуск клиента Рандом трона 3000
 [[noreturn]] void runClientRandomTron3000() {
+
+    struct OledAdapter : FixOled<SSD1306_128x64, OLED_NO_BUFFER> {
+        size_t write(uint8_t data) override {
+            if (isEnd()) {
+                clear();
+                home();
+            }
+            return FixOled::write(data);
+        }
+    };
+
     OledAdapter screen;
     screen.init();
     screen.autoPrintln(true);

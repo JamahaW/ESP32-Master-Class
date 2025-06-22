@@ -1,5 +1,7 @@
-#include <esp_now.h>
+#include <Arduino.h>
+
 #include <WiFi.h>
+#include <esp_now.h>
 
 
 const int pin_led = 12, pin_button = 32;
@@ -7,8 +9,9 @@ const int pin_led = 12, pin_button = 32;
 // Определяем целевой MAC адрес
 std::array<uint8_t, 6> target_mac = {0xfc, 0xe8, 0xc0, 0x74, 0xa6, 0x30};
 
-// Определяем структуру нашего пакета, используем атрибут gnu::packed для компактной упаковки (без padding)
+// Определяем структуру нашего пакета, используем атрибут gnu::packed (без выравнивания)
 struct [[gnu::packed]] Packet {
+    uint32_t send_time_ms;
     bool led_state;
 };
 
@@ -16,6 +19,7 @@ struct [[gnu::packed]] Packet {
 void onReceive(const uint8_t *mac, const uint8_t *data, int size) {
     const auto &packet = *reinterpret_cast<const Packet *>(data);
     digitalWrite(pin_led, packet.led_state);
+    Serial.println(packet.send_time_ms);
 }
 
 // Обработчик на доставку данных
@@ -51,12 +55,13 @@ void setup() {
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, target_mac.data(), 6); // Побайтовое копирование
 
-    esp_now_add_peer(&peer); // Добавляем peer
+    ESP_ERROR_CHECK(esp_now_add_peer(&peer)); // Добавляем peer
 }
 
 void loop() {
     // Заполняем пакет
     Packet packet = {
+        .send_time_ms = millis(),
         .led_state = not digitalRead(pin_button)
     };
 
@@ -70,8 +75,10 @@ void loop() {
         sizeof(Packet)
     );
 
-    // Переводим код ошибки в её наименование для отладки
-    Serial.println(esp_err_to_name(result));
+    if (result != ESP_OK) {
+        // Переводим код ошибки в её наименование
+        Serial.println(esp_err_to_name(result));
+    }
 
     delay(100);
 }

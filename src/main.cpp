@@ -1,13 +1,15 @@
-// Занятие 2.2 - Обработка кнопки прерыванием
+// Занятие 2.3 - Управление двумя кнопками
 #include <Arduino.h>
 
 
-const auto pin_led = 26, pin_button = 14;
+// не const чтобы безопасно привести указатель к void *
+auto pin_led_1 = 26, pin_led_2 = 25;
 
-volatile bool led_state = false;  // Состояние светодиода (изменяется в прерывании)
+const auto pin_button_1 = 14, pin_button_2 = 13;
+
 
 // Обработчик прерывания с защитой от дребезга
-void IRAM_ATTR button_handler() {
+void IRAM_ATTR button_handler(void *arg) {
     static decltype(millis()) last = 0;
     const auto debounce_delay = 100;  // Защита от дребезга (мс)
 
@@ -16,16 +18,24 @@ void IRAM_ATTR button_handler() {
     if (now - last <= debounce_delay) { return; }
     last = now;
 
-    led_state = not led_state;  // Инвертирование состояния
+    // Получение контекста
+    const auto pin_led = *static_cast<uint8_t *>(arg);
+
+    // Инвертирование состояния
+    bool led_state = not digitalRead(pin_led);
     digitalWrite(pin_led, led_state);
 }
 
 void setup() {
-    pinMode(pin_led, OUTPUT);
-    pinMode(pin_button, INPUT_PULLUP);
+    // Инициализация пинов
+    pinMode(pin_led_1, OUTPUT);
+    pinMode(pin_led_2, OUTPUT);
+    pinMode(pin_button_1, INPUT_PULLUP);
+    pinMode(pin_button_2, INPUT_PULLDOWN);
 
-    // Регистрация прерывания на FALLING фронт
-    attachInterrupt(pin_button, button_handler, FALLING);
+    // Регистрация прерываний с передачей контекста
+    attachInterruptArg(pin_button_1, button_handler, &pin_led_1, FALLING);
+    attachInterruptArg(pin_button_2, button_handler, &pin_led_2, RISING);
 }
 
 void loop() {}  // Основная логика в прерывании

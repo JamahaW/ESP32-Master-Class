@@ -26,10 +26,6 @@ void onReceive(const uint8_t *mac, const uint8_t *data, int size) {
 
 // Обработчик на доставку данных
 void onSend(const uint8_t *mac, esp_now_send_status_t status) {
-    // esp_now_send_status_t - перечисление из двух значений
-    // - ESP_NOW_SEND_SUCCESS (= 0)
-    // - ESP_NOW_SEND_FAIL (= 1)
-
     if (status == ESP_NOW_SEND_SUCCESS) {
         Serial.println("ESP_NOW_SEND_SUCCESS");
     } else {
@@ -50,7 +46,6 @@ void setup() {
     esp_now_register_recv_cb(onReceive);
 
     // Зарегистрирует функцию, которая будет вызвана при доставке сообщения (получатель получил наше сообщение)
-    // мы отправили - дошло ли до получателя, проверить статус
     esp_now_register_send_cb(onSend);
 
     // Добавляем пир - структура, важно peer_addr,
@@ -70,11 +65,8 @@ void loop() {
 
     // Отправляем пакет и получаем статус отправки в очередь сообщений
     esp_err_t result = esp_now_send(
-        // целевой MAC (передаём сырой указатель)
         target_mac.data(),
-        // Приводим данные к сырому указателю (реинтерпретация указателя)
         reinterpret_cast<uint8_t *>(&packet),
-        // Размер пакета определяем как размер структуры
         sizeof(Packet)
     );
 

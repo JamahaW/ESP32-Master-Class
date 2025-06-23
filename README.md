@@ -238,13 +238,13 @@ typedef enum {
 
 ```cpp
 // Определяем MAC адрес пира
-std::array<uint8_t, 6> target_mac = { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
+std::array<uint8_t, 6> broadcast_address = { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
 
 // Создаём экземпляр настроек пира
 esp_now_peer_info_t peer = {};
 
-// Копируем содержимое target_mac в peer.peer_addr
-std::copy(target_mac.begin(), target_mac.end(), peer.peer_addr);
+// Копируем содержимое broadcast_address в peer.peer_addr
+std::copy(broadcast_address.begin(), broadcast_address.end(), peer.peer_addr);
 ```
 
 </details>
@@ -254,13 +254,13 @@ std::copy(target_mac.begin(), target_mac.end(), peer.peer_addr);
 
 ```c
 // Определяем MAC адрес пира
-uint8_t target_mac[] = { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
+uint8_t broadcast_address[] = { 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
 
 // Создаём экземпляр настроек пира
 esp_now_peer_info_t peer = { 0 };
 
-// Копируем содержимое target_mac в peer.peer_addr
-memcpy(peer.peer_addr, target_mac, sizeof(peer.peer_addr));
+// Копируем содержимое broadcast_address в peer.peer_addr
+memcpy(peer.peer_addr, broadcast_address, sizeof(peer.peer_addr));
 ```
 
 </details>
@@ -412,7 +412,7 @@ MyPacket packet{ /* Заполняем пакет данными */ };
 // Отправляем пакет и получаем статус отправки в очередь сообщений
 esp_err_t result = esp_now_send(
     // Получаем сырой указатель на МАС адрес
-    target_mac.data(),                      
+    broadcast_address.data(),                      
     // Реинтерпретируем указатель данных нашего пакета как сырой указатель 
     reinterpret_cast<uint8_t *>(&packet),   
     // Автоматически определяем размер пакета размером структуры
@@ -431,7 +431,7 @@ MyPacket packet = { /* Заполняем пакет данными */ };
 // Отправляем пакет и получаем статус отправки в очередь сообщений
 esp_err_t result = esp_now_send(
     // Передаём МАС адрес (Он и есть Си-Массив)
-    target_mac,                             
+    broadcast_address,                             
     // Преобразуем указатель данных
     (uint8_t *)&packet,                     
     // Автоматически определяем размер пакета размером структуры
@@ -477,9 +477,9 @@ esp_err_t result = esp_now_send(
 <summary><strong>1. Динамические указатели</strong></summary>
 
 ```cpp
-Foo *message = new Foo();
+Foo *content = new Foo();
 
-esp_now_send(mac, (uint8_t*)&message, sizeof(message));
+esp_now_send(mac, (uint8_t*)&content, sizeof(content));
 //                          ^--- Передаём указатель на указатель
 delete foo;
 ```

@@ -1,78 +1,58 @@
+// Занятие 5.2 Примитивный мессенджер
+
 #include <Arduino.h>
 
 #include <WiFi.h>
 #include <esp_now.h>
 
 
-const int pin_led = 12, pin_button = 32;
+// определяем широковещательный пир (Для отправки сообщения всех в сети)
+esp_now_peer_info_t peer = {};
 
-// Определяем целевой MAC адрес
-std::array<uint8_t, 6> target_mac = {0xfc, 0xe8, 0xc0, 0x74, 0xa6, 0x30};
-
-// Определяем структуру нашего пакета, используем атрибут gnu::packed (без выравнивания)
-struct [[gnu::packed]] Packet {
-    uint32_t send_time_ms;
-    bool led_state;
+// Определяем вид пакета для сообщения и создаём экземпляр
+struct [[gnu::packed]] Message {
+    std::array<char, 8> username;
+    std::array<char, 64> content;
 };
 
-// Обработчик приёма данных
-void onReceive(const uint8_t *mac, const uint8_t *data, int size) {
-    // Интерпретация данных как пакета
-    const auto &packet = *reinterpret_cast<const Packet *>(data);
+Message packet = {
+    .username = {"Alpha"},  // Имя пользователя
+    .content = {}           // Содержание сообщения пока оставим пустым (заполнено '\0')
+};
 
-    digitalWrite(pin_led, packet.led_state);
-    Serial.printf("%u -> %s", packet.send_time_ms, packet.led_state ? "HIGH" : "LOW");
-}
+void onReceive(const uint8_t *, const uint8_t *data, int size) {
+    // Игнорируем данные, не являющиеся пакетом (Проверка размера)
+    if (size != sizeof(Message)) { return; }
 
-// Обработчик на доставку данных
-void onSend(const uint8_t *mac, esp_now_send_status_t status) {
-    if (status == ESP_NOW_SEND_SUCCESS) {
-        Serial.println("ESP_NOW_SEND_SUCCESS");
-    } else {
-        Serial.println("ESP_NOW_SEND_FAIL");
-    }
+    const auto &message = reinterpret_cast<const Message *>(data); // Интерпретируем пакет
+
+    Serial.printf("<%s> %s\n", message->username.data(), message->content.data());
 }
 
 void setup() {
-    pinMode(12, OUTPUT);
-    pinMode(32, INPUT_PULLUP);
-    Serial.begin(9600);
+    Serial.begin(115200);
 
-    WiFi.mode(WIFI_STA); // Устанавливаем режим работы NOLINT(*-static-accessed-through-instance)
-    ESP_ERROR_CHECK(esp_now_init()); // Инициализируем протокол
-    // макрос ESP_ERROR_CHECK(x) реализует проверку, а в случае ошибки завершает исполнение
-
-    // Зарегистрирует функцию при получении пакета
+    // Инициализируем протокол
+    WiFi.mode(WIFI_STA);
+    esp_now_init();
     esp_now_register_recv_cb(onReceive);
 
-    // Зарегистрирует функцию, которая будет вызвана при доставке сообщения (получатель получил наше сообщение)
-    esp_now_register_send_cb(onSend);
-
-    // Добавляем пир - структура, важно peer_addr,
-    esp_now_peer_info_t peer = {};
-    std::copy(target_mac.begin(), target_mac.end(), peer.peer_addr);
-
-    ESP_ERROR_CHECK(esp_now_add_peer(&peer)); // Добавляем peer
+    // Добавляем широковещательный пир
+    std::array<uint8_t, 6> broadcast_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+    std::copy(broadcast_address.begin(), broadcast_address.end(), peer.peer_addr);
+    esp_now_add_peer(&peer);
 }
 
 void loop() {
+    delay(1);
+
+    // Ждём пока в порте появится сообщение
+    if (Serial.available() < 1) { return; }
+
     // Заполняем пакет
-    Packet packet = {
-        .send_time_ms = millis(),
-        .led_state = not digitalRead(pin_button)
-    };
+    Serial.readBytesUntil('\n', packet.content.data(), packet.content.size());
 
-    // Отправляем пакет и получаем статус отправки в очередь сообщений
-    esp_err_t result = esp_now_send(
-        target_mac.data(),
-        reinterpret_cast<uint8_t *>(&packet),
-        sizeof(Packet)
-    );
-
-    if (result != ESP_OK) {
-        // Переводим код ошибки в её наименование
-        Serial.println(esp_err_to_name(result));
-    }
-
-    delay(100);
+    // Отправляем сообщение
+    esp_err_t result = esp_now_send(peer.peer_addr, reinterpret_cast<uint8_t *>(&packet), sizeof(Message));
+    if (result != ESP_OK) { Serial.println(esp_err_to_name(result)); }
 }

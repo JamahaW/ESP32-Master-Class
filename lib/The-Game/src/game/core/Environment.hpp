@@ -11,6 +11,9 @@ namespace game {
         /// Игровое окружение
         struct Environment {
 
+            /// Минимальный период отправки (ms)
+            uint32_t send_min_period;
+
             /// Результат действия игры
             enum class MakeMove {
                 /// Успешный ход
@@ -24,6 +27,8 @@ namespace game {
             rs::Result<MakeMove> makeMove(const Player &player, const ClientMove &move) {
                 return {MakeMove::Ok};
             }
+
+            Environment() = delete;
         };
     }
 }

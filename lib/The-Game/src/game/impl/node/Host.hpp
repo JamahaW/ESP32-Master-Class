@@ -121,6 +121,7 @@ namespace game {
                         ));
 
                         player.username = message;
+                        player.last_send = millis();
                     }
                 }
 
@@ -135,19 +136,35 @@ namespace game {
                             EspNow::toString(mac).data()
                         ));
 
-                    } else {
-                        // Игрок зарегистрирован - отправляем запись действия в очередь
+                        return;
+                    }
 
-                        auto &player = it->second;
+                    auto &player = it->second;
+                    const auto now = millis();
 
-                        moves.push(MoveRecord{mac, player, move});
+                    const auto time_since_last = now - player.last_send;
+
+                    if (time_since_last < environment.send_min_period) {
+                        const auto secs = float(environment.send_min_period - time_since_last) * 1e-3f;
 
                         send(mac, rs::formatted<sizeof(core::ServerMessage)>(
-                            "Клиент %s (Игрок %s) ход отправлен в очередь",
+                            "Клиент %s (Игрок %s) подождите %.3f с",
                             EspNow::toString(mac).data(),
-                            player.username.data()
+                            player.username.data(),
+                            secs
                         ));
+                        return;
                     }
+
+                    player.last_send = now;
+
+                    moves.push(MoveRecord{mac, player, move});
+
+                    send(mac, rs::formatted<sizeof(core::ServerMessage)>(
+                        "Клиент %s (Игрок %s) ход отправлен в очередь",
+                        EspNow::toString(mac).data(),
+                        player.username.data()
+                    ));
                 }
 
                 void onPlayerUnknown(const EspNow::Mac &mac, int size) {

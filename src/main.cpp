@@ -20,7 +20,9 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
-    game::core::Environment environment;
+    game::core::Environment environment = {
+        .send_min_period = 4000,
+    };
 
     game::impl::node::Host host(environment, Serial);
 

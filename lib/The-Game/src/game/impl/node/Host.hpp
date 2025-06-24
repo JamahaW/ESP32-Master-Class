@@ -6,10 +6,9 @@
 #include "game/core/Environment.hpp"
 
 #include "Arduino.h"
+
 #include <map>
 #include <queue>
-
-#include "rs/ArrayString.hpp"
 
 
 namespace game {
@@ -36,14 +35,11 @@ namespace game {
                 /// Поток вывода
                 serialcmd::StreamSerializer &serializer;
 
-                /// Очередь сообщений логов
-                std::queue<LogMessage> logs{};
-
                 /// Сведения о клиентах
-                std::map<EspNow::Mac, core::Player> clients{};
+                std::map<espnow::Mac, core::Player> clients{};
 
                 struct SendRecord {
-                    EspNow::Mac mac;
+                    espnow::Mac mac;
                     core::ServerMessage message;
                 };
 
@@ -51,7 +47,7 @@ namespace game {
                 std::queue<SendRecord> sends{};
 
                 struct MoveRecord {
-                    EspNow::Mac mac;
+                    espnow::Mac mac;
                     const core::Player &player;
                     const core::ClientMove move;
                 };
@@ -66,7 +62,7 @@ namespace game {
 
                 void sendMac() {
                     serializer.write(MessageType::SendMac);
-                    serializer.write(EspNow::instance().mac);
+                    serializer.write(espnow::Protocol::instance().mac);
                 }
 
                 void sendPlayerListUpdate() {
@@ -101,7 +97,8 @@ namespace game {
                 }
 
                 void sendLog(LogMessage &&message) {
-                    logs.push(message);
+                    serializer.write(MessageType::LogOutput);
+                    serializer.write(message);
                 }
 
             public:
@@ -117,19 +114,10 @@ namespace game {
                         sendPeer(record.mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Ход (%d, %d) : %s",
                             record.move.x, record.move.y,
-                            core::Environment::toString(result.value)
+                            rs::toString(result.value)
                         ));
 
-                        if (result.fail()) {
-                            if (result.value == core::Environment::MakeMove::WinnerFounded) {
-                                sendLog(rs::formatted<sizeof(LogMessage)>(
-                                    "Победитель: %s\n",
-                                    record.player.username.data()
-                                ));
-                            }
-                        } else {
-                            sendFieldState();
-                        }
+                        if (result.ok()) { sendFieldState(); }
 
                         moves.pop();
                     }
@@ -137,39 +125,30 @@ namespace game {
                     if (not sends.empty()) {
                         const auto &record = sends.front();
 
-                        if (not EspNow::checkPeerExist(record.mac)) {
-                            EspNow::addPeer(record.mac);
+                        if (not espnow::Peer::exist(record.mac)) {
+                            espnow::Peer::add(record.mac);
                         }
 
-                        auto result = EspNow::send(record.mac, record.message);
+                        auto result = espnow::Protocol::send(record.mac, record.message);
 
                         sendLog(rs::formatted<sizeof(LogMessage)>(
                             "Отправка ответа %s .. ",
-                            EspNow::toString(record.mac).data()
+                            rs::toArrayString(record.mac).data()
                         ));
 
                         if (result.ok()) {
                             sends.pop();
 
                             sendLog(rs::formatted<sizeof(LogMessage)>(
-                                "Ok   -> %s\n",
+                                "Ok   -> %s",
                                 record.message.data()
                             ));
                         } else {
                             sendLog(rs::formatted<sizeof(LogMessage)>(
-                                "Fail -> %s\n",
-                                EspNow::toString(result)
+                                "Fail -> %s",
+                                rs::toString(result.value)
                             ));
                         }
-                    }
-
-                    if (not logs.empty()) {
-                        const auto &message = logs.front();
-
-                        serializer.write(MessageType::LogOutput);
-                        serializer.write(message);
-
-                        logs.pop();
                     }
                 }
 
@@ -177,7 +156,7 @@ namespace game {
 
                 // Обработчики сообщений
 
-                void onPlayerMessage(const EspNow::Mac &mac, const core::ClientMessage &message) {
+                void onPlayerMessage(const espnow::Mac &mac, const core::ClientMessage &message) {
                     const auto &it = clients.find(mac);
 
                     if (it == clients.end()) {
@@ -188,7 +167,7 @@ namespace game {
 
                         sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Клиент %s зарегистрирован как '%s' номер команды: %d",
-                            EspNow::toString(mac).data(),
+                            rs::toArrayString(mac).data(),
                             player.username.data(),
                             player.team
                         ));
@@ -199,7 +178,7 @@ namespace game {
 
                         sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Клиент %s переименован ('%s' -> '%s')",
-                            EspNow::toString(mac).data(),
+                            rs::toArrayString(mac).data(),
                             player.username.data(),
                             message.data()
                         ));
@@ -211,7 +190,7 @@ namespace game {
                     sendPlayerListUpdate();
                 }
 
-                void onPlayerMove(const EspNow::Mac &mac, const core::ClientMove &move) {
+                void onPlayerMove(const espnow::Mac &mac, const core::ClientMove &move) {
                     const auto &it = clients.find(mac);
 
                     if (it == clients.end()) {
@@ -219,7 +198,7 @@ namespace game {
 
                         sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Клиент %s (не зарегистрирован) ход отклонён",
-                            EspNow::toString(mac).data()
+                            rs::toArrayString(mac).data()
                         ));
 
                         return;
@@ -235,7 +214,7 @@ namespace game {
 
                         sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Клиент %s (Игрок %s) подождите %.3f с",
-                            EspNow::toString(mac).data(),
+                            rs::toArrayString(mac).data(),
                             player.username.data(),
                             secs
                         ));
@@ -248,19 +227,19 @@ namespace game {
 
                     sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>(
                         "Клиент %s (Игрок %s) ход отправлен в очередь",
-                        EspNow::toString(mac).data(),
+                        rs::toArrayString(mac).data(),
                         player.username.data()
                     ));
                 }
 
-                void onPlayerUnknown(const EspNow::Mac &mac, int size) {
+                void onPlayerUnknown(const espnow::Mac &mac, int size) {
                     sendPeer(mac, rs::formatted<sizeof(core::ServerMessage)>("Непредвиденный размер пакета (%d)", size));
                 }
 
                 // сервис
 
                 /// Добавить сообщение в очередь на отправку
-                void sendPeer(const EspNow::Mac &mac, core::ServerMessage message) {
+                void sendPeer(const espnow::Mac &mac, core::ServerMessage message) {
                     sends.push(SendRecord{mac, message});
                 }
 
@@ -268,15 +247,15 @@ namespace game {
 
                 // Обработчики событий
 
-                void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) final {
+                void onDelivery(const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) final {
                     sendLog(rs::formatted<sizeof(LogMessage)>(
-                        "Отправка клиенту %s : %s\n",
-                        EspNow::toString(mac).data(),
-                        EspNow::toString(status)
+                        "Отправка клиенту %s : %s",
+                        rs::toArrayString(mac).data(),
+                        rs::toString(status)
                     ));
                 }
 
-                void onReceive(const EspNow::Mac &mac, const void *data, int size) final {
+                void onReceive(const espnow::Mac &mac, const void *data, int size) final {
                     switch (size) {
                         case sizeof(core::ClientMessage):
                             onPlayerMessage(mac, *static_cast<const core::ClientMessage *>(data));

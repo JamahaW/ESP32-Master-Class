@@ -5,27 +5,17 @@
 #include <Arduino.h>
 #include "WiFi.h"
 
-#include "FixOled.h"
-
-
-using game::core::ClientMessage;
-using game::core::ClientMove;
-
 
 /// Адрес сервера
-constexpr EspNow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
-
-/// Адрес Рандом Трона 3000
-constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30};
+constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
     game::core::Environment environment = {
-        .win_length = 8,
+        .win_length = 14,
         .field_size = {16, 16},
         .field_state = {},
-        .move_timeout = 2000,
-        .winner = nullptr,
+        .move_timeout = 5000,
     };
 
     serialcmd::StreamSerializer serializer(Serial);
@@ -40,48 +30,32 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
     }
 }
 
-/// Запуск клиента Рандом трона 3000
-[[noreturn]] void runClientRandomTron3000() {
-
-    struct OledAdapter : FixOled<SSD1306_128x64, OLED_NO_BUFFER> {
-        size_t write(uint8_t data) override {
-            if (isEnd()) {
-                clear();
-                home();
-            }
-            return FixOled::write(data);
-        }
-    };
-
-    OledAdapter screen;
-    screen.init();
-    screen.autoPrintln(true);
-
-    game::impl::node::Client client(server_address, screen);
-
-    client.init();
-    client.sendMessage(ClientMessage{"RandomTron-3000"});
-
-    auto rand = []() {
-        return ClientMove::Value(random() % 16);
-    };
-
-    while (true) {
-        client.sendMove(ClientMove{rand(), rand()});
-        delay(rand() * 300);
-    }
-}
 
 /// Запуск клиента пользователя
 [[noreturn]] void runClientUser() {
     game::impl::node::Client client(server_address, Serial);
 
     client.init();
-    client.sendMessage(ClientMessage{"User"});
+
+    client.send(rs::formatted<sizeof(game::core::ClientMessage)>(
+        "User %s",
+        rs::toArrayString(espnow::Protocol::instance().mac).data()
+    ));
+
+    unsigned int x, y;
 
     while (true) {
-        client.sendMove(ClientMove{123, 69});
-        delay(5000);
+        delay(10);
+
+        if (Serial.available() < 1) { continue; }
+
+        String input = Serial.readStringUntil('\n');
+        if (sscanf(input.c_str(), "%d %d", &x, &y) != 2) { continue; }
+
+        client.send(game::core::ClientMove{
+            .x = rs::u8(x),
+            .y = rs::u8(y)
+        });
     }
 }
 
@@ -91,19 +65,14 @@ void setup() {
 
     WiFiClass::mode(WIFI_MODE_STA);
 
-    EspNow::init();
+    espnow::Protocol::init();
 
-    auto &esp_now = EspNow::instance();
-    const bool is_server = esp_now.mac == server_address;
+    auto &esp_now = espnow::Protocol::instance();
 
-    if (is_server) {
+    if (esp_now.mac == server_address) {
         runServer();
     } else {
-        if (esp_now.mac == random_tron_address) {
-            runClientRandomTron3000();
-        } else {
-            runClientUser();
-        }
+        runClientUser();
     }
 }
 

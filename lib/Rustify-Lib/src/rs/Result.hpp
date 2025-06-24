@@ -1,5 +1,8 @@
 #pragma once
 
+#include "primitives.hpp"
+
+
 namespace rs {
 
     /// Result тип на основе перечисления

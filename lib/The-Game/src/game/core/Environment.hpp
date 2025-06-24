@@ -31,30 +31,17 @@ namespace game {
                 }
             };
 
-            /// Длина полосы для выигрыша
-            ClientMove::Value win_length;
-            /// Размер доски
-            ClientMove field_size;
-            /// Состояние доски
-            std::unordered_map<ClientMove, Player::Team, ClientMoveHash, ClientMoveEqual> field_state;
-            /// Минимальный период отправки (ms)
-            uint32_t move_timeout;
-            /// Текущий победитель (Опция)
-            const Player::Team *winner;
-
+            ClientMove::Value win_length; ///< Длина полосы для выигрыша
+            ClientMove field_size; ///< Размер доски
+            std::unordered_map<ClientMove, Player::Team, ClientMoveHash, ClientMoveEqual> field_state; ///< Состояние доски
+            uint32_t move_timeout; ///< Минимальный период отправки (ms)
 
             /// Результат действия игры
             enum class MakeMove {
-                /// Успешный ход
-                Ok = 0,
-                /// Завершение игры - найден победитель
-                WinnerFounded,
-                /// Неверное значение хода
-                InvalidArg,
-                /// Поле занято
-                FieldNotEmpty,
-                /// Ход вне игрового поля
-                OutOfBounds,
+                Ok = 0,            ///< Успешный ход ,
+                WinnerFounded,     ///< Завершение игры - найден победитель
+                FieldNotEmpty,     ///< Поле занято
+                OutOfBounds,       ///< Ход вне игрового поля
             };
 
             rs::Result<MakeMove> makeMove(const Player &player, const ClientMove &move) {
@@ -71,7 +58,7 @@ namespace game {
 
                 field_state[move] = player.team;
 
-                winner = checkWin();
+                const auto *winner = checkWin();
 
                 if (winner == nullptr) {
                     return {MakeMove::Ok};
@@ -148,20 +135,19 @@ namespace game {
 
         public:
 
-            static rs::str toString(MakeMove result) {
-                switch (result) {
-                    return_case(MakeMove::Ok)
-                    return_case(MakeMove::WinnerFounded)
-                    return_case(MakeMove::InvalidArg)
-                    return_case(MakeMove::FieldNotEmpty)
-                    return_case(MakeMove::OutOfBounds)
-                    return_default()
-                }
-            }
-
-        public:
-
             Environment() = delete;
         };
+    }
+}
+
+namespace rs {
+    static str toString(game::core::Environment::MakeMove result) {
+        switch (result) {
+            return_case(game::core::Environment::MakeMove::Ok)
+            return_case(game::core::Environment::MakeMove::WinnerFounded)
+            return_case(game::core::Environment::MakeMove::FieldNotEmpty)
+            return_case(game::core::Environment::MakeMove::OutOfBounds)
+            return_default()
+        }
     }
 }

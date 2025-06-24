@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EspNow.hpp"
+#include "espnow/Protocol.hpp"
 
 
 namespace game {
@@ -13,13 +13,13 @@ namespace game {
 
             /// Инициализировать узел
             void init() {
-                auto &esp_now = EspNow::instance();
+                auto &esp_now = espnow::Protocol::instance();
 
-                auto on_delivery = [this](const EspNow::Mac &mac, EspNow::DeliveryStatus status) {
+                auto on_delivery = [this](const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) {
                     this->onDelivery(mac, status);
                 };
 
-                auto on_receive = [this](const EspNow::Mac &mac, const void *data, int size) {
+                auto on_receive = [this](const espnow::Mac &mac, const void *data, int size) {
                     this->onReceive(mac, data, size);
                 };
 
@@ -30,10 +30,10 @@ namespace game {
         protected:
 
             /// Обработчик доставки сообщения
-            virtual void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) = 0;
+            virtual void onDelivery(const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) = 0;
 
             /// Обработчик приёма сообщения
-            virtual void onReceive(const EspNow::Mac &mac, const void *data, int size) = 0;
+            virtual void onReceive(const espnow::Mac &mac, const void *data, int size) = 0;
         };
     }
 }

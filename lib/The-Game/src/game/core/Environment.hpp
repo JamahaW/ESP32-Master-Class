@@ -2,6 +2,8 @@
 
 #include <unordered_map>
 
+#include "serialcmd/StreamSerializer.hpp"
+
 #include "rs/Result.hpp"
 #include "rs/macro.hpp"
 
@@ -34,27 +36,12 @@ namespace game {
             /// Размер доски
             ClientMove field_size;
             /// Состояние доски
-            std::unordered_map<ClientMove, Player::Team, ClientMoveHash, ClientMoveEqual> _field_state;
+            std::unordered_map<ClientMove, Player::Team, ClientMoveHash, ClientMoveEqual> field_state;
             /// Минимальный период отправки (ms)
             uint32_t move_timeout;
             /// Текущий победитель (Опция)
             const Player::Team *winner;
 
-            static Environment create(
-                ClientMove field_size,
-                ClientMove::Value win_len,
-                uint32_t move_timeout
-            ) {
-                Environment instance = {
-                    .win_length = win_len,
-                    .field_size = field_size,
-                    ._field_state = {},
-                    .move_timeout = move_timeout,
-                    .winner = nullptr,
-                };
-
-                return instance;
-            }
 
             /// Результат действия игры
             enum class MakeMove {
@@ -77,12 +64,12 @@ namespace game {
                 }
 
                 // Проверка занятости поля
-                const auto it = _field_state.find(move);
-                if (it != _field_state.end()) {
+                const auto it = field_state.find(move);
+                if (it != field_state.end()) {
                     return {MakeMove::FieldNotEmpty};
                 }
 
-                _field_state[move] = player.team;
+                field_state[move] = player.team;
 
                 winner = checkWin();
 
@@ -95,9 +82,9 @@ namespace game {
 
             /// Проверить состояние клетки
             const Player::Team *getFieldState(const ClientMove &move) const {
-                auto it = _field_state.find(move);
+                auto it = field_state.find(move);
 
-                if (it != _field_state.end()) {
+                if (it != field_state.end()) {
                     return &it->second;
                 }
 
@@ -106,14 +93,14 @@ namespace game {
 
             /// Очистить игровое поле
             void clearField() {
-                _field_state.clear();
+                field_state.clear();
             }
 
         private:
 
             const Player::Team *checkWin() const {
                 // Проверяем только занятые клетки
-                for (const auto &v: _field_state) {
+                for (const auto &v: field_state) {
                     const auto &position = v.first;
                     const auto &team = v.second;
 

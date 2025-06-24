@@ -20,15 +20,20 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
-    auto environment = game::core::Environment::create(
-        {8, 8},
-        6,
-        200
-    );
+    game::core::Environment environment = {
+        .win_length = 8,
+        .field_size = {16, 16},
+        .field_state = {},
+        .move_timeout = 2000,
+        .winner = nullptr,
+    };
 
-    game::impl::node::Host host(environment, Serial);
+    serialcmd::StreamSerializer serializer(Serial);
+
+    game::impl::node::Host host(environment, serializer);
 
     host.init();
+    host.sendMac();
 
     while (true) {
         host.pull();
@@ -58,12 +63,12 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
     client.sendMessage(ClientMessage{"RandomTron-3000"});
 
     auto rand = []() {
-        return ClientMove::Value(random() % 8);
+        return ClientMove::Value(random() % 16);
     };
 
     while (true) {
         client.sendMove(ClientMove{rand(), rand()});
-        delay(rand() * 30);
+        delay(rand() * 300);
     }
 }
 
@@ -90,12 +95,6 @@ void setup() {
 
     auto &esp_now = EspNow::instance();
     const bool is_server = esp_now.mac == server_address;
-
-    Serial.printf(
-        "MAC: %s (Роль: %s)\n",
-        EspNow::toString(esp_now.mac).data(),
-        is_server ? "Сервер" : "Клиент"
-    );
 
     if (is_server) {
         runServer();

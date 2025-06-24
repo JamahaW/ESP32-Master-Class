@@ -88,9 +88,9 @@ void setup() {
     const bool is_server = esp_now.mac == server_address;
 
     Serial.printf(
-        "Self: %s (Role: %s)\n",
+        "MAC: %s (Роль: %s)\n",
         EspNow::toString(esp_now.mac).data(),
-        is_server ? "Server" : "Client"
+        is_server ? "Сервер" : "Клиент"
     );
 
     if (is_server) {

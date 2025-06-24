@@ -77,7 +77,7 @@ namespace game {
 
                     auto result = EspNow::send(record.mac, record.message);
 
-                    out.printf("Sending reply to %s .. ", EspNow::toString(record.mac).data());
+                    out.printf("Отправка ответа %s .. ", EspNow::toString(record.mac).data());
 
                     if (result.ok()) {
                         sends.pop();
@@ -102,7 +102,7 @@ namespace game {
                     clients.emplace(mac, player);
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
-                        "Client %s registered as '%s' team: %d",
+                        "Клиент %s зарегистрирован как '%s' номер команды: %d",
                         EspNow::toString(mac).data(),
                         player.username.data(),
                         player.team
@@ -113,7 +113,7 @@ namespace game {
                     auto &player = it->second;
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
-                        "Client %s renamed from '%s' to '%s'",
+                        "Клиент %s переименован ('%s' -> '%s')",
                         EspNow::toString(mac).data(),
                         player.username.data(),
                         message.data()
@@ -130,7 +130,7 @@ namespace game {
                     // Игрок не зарегистрирован - отказ в действии
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
-                        "Client %s (Not registered) move denied",
+                        "Клиент %s (не зарегистрирован) ход отклонён",
                         EspNow::toString(mac).data()
                     ));
 
@@ -142,7 +142,7 @@ namespace game {
                     moves.push(MoveRecord{mac, player, move});
 
                     send(mac, rs::formatted<sizeof(core::ServerMessage)>(
-                        "Client %s (Player %s) move send to queue",
+                        "Клиент %s (Игрок %s) ход отправлен в очередь",
                         EspNow::toString(mac).data(),
                         player.username.data()
                     ));
@@ -150,7 +150,7 @@ namespace game {
             }
 
             void onPlayerUnknown(const EspNow::Mac &mac, int size) {
-                send(mac, rs::formatted<sizeof(core::ServerMessage)>("Invalid Packed (%d Bytes)", size));
+                send(mac, rs::formatted<sizeof(core::ServerMessage)>("Непредвиденный размер пакета (%d)", size));
             }
 
             // сервис
@@ -166,7 +166,7 @@ namespace game {
 
             void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) final {
                 out.printf(
-                    "Delivery to client %s : %s\n",
+                    "Отправка клиенту %s : %s\n",
                     EspNow::toString(mac).data(),
                     EspNow::toString(status)
                 );

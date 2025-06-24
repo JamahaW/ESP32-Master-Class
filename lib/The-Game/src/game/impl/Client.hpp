@@ -35,7 +35,7 @@ namespace game {
 
             void onDelivery(const EspNow::Mac &mac, EspNow::DeliveryStatus status) final {
                 out.printf(
-                    "Delivery to server %s : %s\n",
+                    "Отправка (%s) : %s\n",
                     EspNow::toString(mac).data(),
                     EspNow::toString(status)
                 );
@@ -45,7 +45,7 @@ namespace game {
                 // Проверка, что сообщение пришло от сервера
                 if (mac != server) {
                     out.printf(
-                        "Message (%d Bytes) from %s (not server)\n",
+                        "Пакет (%d Байт) от %s (не сервер)\n",
                         size,
                         EspNow::toString(mac).data());
                     return;
@@ -54,7 +54,7 @@ namespace game {
                 // Проверка размера пакета
                 if (size != sizeof(core::ServerMessage)) {
                     out.printf(
-                        "Got message from %s (server) with incorrect size (%d) expected (%d)\n",
+                        "Получен пакет от %s (сервер) с неожиданной длиной сообщения (%d) ожидалось: %d\n",
                         EspNow::toString(mac).data(),
                         size,
                         sizeof(core::ServerMessage));
@@ -62,7 +62,7 @@ namespace game {
                 }
 
                 const auto &message = *static_cast<const core::ServerMessage *>(data);
-                out.print("Server: ");
+                out.print("Сервер: ");
                 out.println(message.data());
             }
         };

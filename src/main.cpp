@@ -20,9 +20,11 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
-    game::core::Environment environment = {
-        .send_min_period = 4000,
-    };
+    auto environment = game::core::Environment::create(
+        {8, 8},
+        6,
+        200
+    );
 
     game::impl::node::Host host(environment, Serial);
 
@@ -56,12 +58,12 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
     client.sendMessage(ClientMessage{"RandomTron-3000"});
 
     auto rand = []() {
-        return ClientMove::Value(random() & 0b1111);
+        return ClientMove::Value(random() % 8);
     };
 
     while (true) {
         client.sendMove(ClientMove{rand(), rand()});
-        delay(rand() * 300);
+        delay(rand() * 30);
     }
 }
 

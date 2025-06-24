@@ -17,6 +17,8 @@ namespace rs {
         constexpr bool fail() const noexcept {
             return not ok();
         }
+
+        Result() = delete;
     };
 }
 

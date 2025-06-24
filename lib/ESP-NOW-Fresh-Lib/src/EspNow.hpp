@@ -11,10 +11,8 @@
 #include "rs/Result.hpp"
 #include "rs/ArrayString.hpp"
 #include "rs/primitives.hpp"
+#include "rs/macro.hpp"
 
-
-#define return_case(__v) case __v: return #__v;
-#define return_default() default: return "Invalid";
 
 static constexpr char mac_format_string[] = "[%02X:%02X:%02X:%02X:%02X:%02X]";
 

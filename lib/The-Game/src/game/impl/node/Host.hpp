@@ -60,10 +60,14 @@ namespace game {
 
                         auto result = environment.makeMove(record.player, record.move);
 
-                        if (result.ok()) {
-                            send(record.mac, core::ServerMessage{"Move Ok"});
-                        } else {
-                            send(record.mac, core::ServerMessage{"Move error"});
+                        send(record.mac, rs::formatted<sizeof(core::ServerMessage)>(
+                            "Ход (%d, %d) : %s",
+                            record.move.x, record.move.y,
+                            core::Environment::toString(result.value)
+                        ));
+
+                        if (result.fail()) {
+                            out.printf("Победитель: %s\n", record.player.username.data());
                         }
 
                         moves.pop();
@@ -144,8 +148,8 @@ namespace game {
 
                     const auto time_since_last = now - player.last_send;
 
-                    if (time_since_last < environment.send_min_period) {
-                        const auto secs = float(environment.send_min_period - time_since_last) * 1e-3f;
+                    if (time_since_last < environment.move_timeout) {
+                        const auto secs = float(environment.move_timeout - time_since_last) * 1e-3f;
 
                         send(mac, rs::formatted<sizeof(core::ServerMessage)>(
                             "Клиент %s (Игрок %s) подождите %.3f с",

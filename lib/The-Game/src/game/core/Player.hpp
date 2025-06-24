@@ -7,10 +7,13 @@ namespace game {
     namespace core {
         /// Данные пользователя
         struct Player {
+            /// Определение примитива для номера команды
+            using Team = uint8_t;
+
             /// Отображаемое имя пользователя
             ClientMessage username;
             /// Номер команды
-            uint8_t team;
+            Team team;
             /// Момент прошлой отправки
             uint32_t last_send;
 

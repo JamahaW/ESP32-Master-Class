@@ -1,5 +1,5 @@
-#include "game/impl/Client.hpp"
-#include "game/impl/Host.hpp"
+#include "game/impl/node/Client.hpp"
+#include "game/impl/node/Host.hpp"
 #include "game/core/Protocol.hpp"
 
 #include <Arduino.h>
@@ -22,7 +22,7 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 [[noreturn]] void runServer() {
     game::core::Environment environment;
 
-    game::impl::Host host(environment, Serial);
+    game::impl::node::Host host(environment, Serial);
 
     host.init();
 
@@ -48,7 +48,7 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
     screen.init();
     screen.autoPrintln(true);
 
-    game::impl::Client client(server_address, screen);
+    game::impl::node::Client client(server_address, screen);
 
     client.init();
     client.sendMessage(ClientMessage{"RandomTron-3000"});
@@ -65,7 +65,7 @@ constexpr EspNow::Mac random_tron_address = {0xFC, 0xE8, 0xC0, 0x74, 0xA6, 0x30}
 
 /// Запуск клиента пользователя
 [[noreturn]] void runClientUser() {
-    game::impl::Client client(server_address, Serial);
+    game::impl::node::Client client(server_address, Serial);
 
     client.init();
     client.sendMessage(ClientMessage{"User"});

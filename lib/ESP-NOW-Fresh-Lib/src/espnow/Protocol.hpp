@@ -27,7 +27,7 @@ struct Protocol {
     };
 
     using OnDeliveryFunction = std::function<void(const Mac &, DeliveryStatus)>;
-    using OnReceiveFunction = std::function<void(const Mac &, const void *, int)>;
+    using OnReceiveFunction = std::function<void(const Mac &, const void *, rs::u8)>;
 
     /// Мак адрес этого устройства
     const Mac mac;
@@ -124,13 +124,26 @@ struct Protocol {
         };
     }
 
+    /// Отправить сообщение (данные из буфера)
+    static rs::Result<Send> send(const Mac &mac, const void *data, rs::u8 size) {
+        if (size > ESP_NOW_KEY_LEN) { return {Send::InvalidArg}; }
+
+        return {
+            translateSend(esp_now_send(
+                mac.data(),
+                reinterpret_cast<const rs::u8 *>(data),
+                size
+            ))
+        };
+    }
+
 private:
 
     static void onReceive(const rs::u8 *mac, const rs::u8 *data, int size) {
         instance()._on_receive(
             castMac(mac),
             static_cast<const void *>(data),
-            size
+            static_cast<rs::u8>(size)
         );
     }
 

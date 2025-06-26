@@ -1,13 +1,10 @@
-#include "espnow/Mac.hpp"
-
-#include "serialcmd/Serializer.hpp"
-#include "serialcmd/Protocol.hpp"
-
-#include "game/impl/node/Bridge.hpp"
-#include "game/impl/node/Client.hpp"
+#include "serialcmd/impl/protocol/GameProtocol.hpp"
 
 #include "Arduino.h"
 #include "WiFi.h"
+
+#include "espnow/Protocol.hpp"
+#include "game/Packets.hpp"
 
 
 /// Адрес сервера
@@ -15,29 +12,128 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
+    using serialcmd::Serializer;
+    using serialcmd::impl::protocol::GameProtocol;
 
     /// Протокол связи между компьютером и игровой средой
-    auto game_protocol = serialcmd::Protocol<rs::u8, rs::u8>{Serial};
+    auto bridge = GameProtocol(Serial);
 
-    /// узел сети ESP NOW для связи с клиентами
-    auto game_host = game::impl::node::Bridge{};
+    auto on_delivery = [&bridge](const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) {
+        auto &s = bridge.send_espnow_delivery_status.begin();
 
-    game_host.init();
+        // mac
+        s.write(mac);
+
+        // status
+        s.write(status);
+    };
+
+    auto on_receive = [&bridge](const espnow::Mac &mac, const void *data, rs::u8 size) {
+        auto &s = bridge.send_espnow_client_packet.begin();
+
+        // mac
+        s.write(mac);
+
+        // vec
+        s.write(size);
+        s.stream.write(static_cast<const rs::u8 *>(data), size);
+    };
+
+    auto &now = espnow::Protocol::instance();
+    now.setReceiveHandler(on_receive);
+    now.setDeliveryHandler(on_delivery);
+
+    /// { [6]u8, [u8]u8 }
+    auto on_espnow_send = [&bridge](Serializer &serializer) {
+        espnow::Mac mac;
+        serializer.read(mac);
+
+        rs::u8 size;
+        serializer.read(size);
+
+        rs::u8 data[size];
+        serializer.stream.readBytes(data, size);
+
+        if (not espnow::Peer::exist(mac)) {
+            auto result = espnow::Peer::add(mac);
+
+            auto &s = bridge.send_log.begin();
+            s.write(rs::formatted<sizeof(game::HostLogMessage)>(
+                "peer %s add : %s",
+                rs::toArrayString(mac).data(),
+                rs::toString(result.value)
+            ));
+        }
+
+        auto result = espnow::Protocol::send(mac, data, size);
+
+        auto &s = bridge.send_log.begin();
+        s.write(rs::formatted<sizeof(game::HostLogMessage)>(
+            "send to %s : status: %s",
+            rs::toArrayString(mac).data(),
+            rs::toString(result.value)
+        ));
+    };
+
+    /// ()
+    auto on_get_mac = [&bridge](Serializer &serializer) {
+        auto &s = bridge.send_mac.begin();
+        s.write(espnow::Protocol::instance().mac);
+    };
+
+    bridge.registerReceiver(on_get_mac);
+    bridge.registerReceiver(on_espnow_send);
 
     while (true) {
         delay(10);
-
+        bridge.pull();
     }
 }
 
-
 /// Запуск клиента пользователя
 [[noreturn]] void runClientUser() {
-    game::impl::node::Client client(server_address, Serial);
 
-    client.init();
+    auto onDelivery = [](const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) {
+        Serial.printf(
+            "Отправка %s : %s\n",
+            rs::toArrayString(mac).data(),
+            rs::toString(status)
+        );
+    };
 
-    client.send(rs::formatted<sizeof(game::core::ClientMessage)>(
+    auto onReceive = [](const espnow::Mac &mac, const void *data, rs::u8 size) {
+        // Проверка, что сообщение пришло от сервера
+        if (mac != server_address) {
+            Serial.printf(
+                "Пакет (%d) от %s (не сервер)\n",
+                size,
+                rs::toArrayString(mac).data()
+            );
+            return;
+        }
+
+        // Проверка размера пакета
+        if (size != sizeof(game::ServerMessage)) {
+            Serial.printf(
+                "Получен пакет от %s (сервер) с неожиданной длиной сообщения (%d) ожидалось: %d\n",
+                rs::toArrayString(mac).data(),
+                size,
+                sizeof(game::ServerMessage)
+            );
+            return;
+        }
+
+        const auto &message = *static_cast<const game::ServerMessage *>(data);
+
+        Serial.print("Сервер: ");
+        Serial.println(message.data());
+    };
+
+    auto &now = espnow::Protocol::instance();
+    now.setReceiveHandler(onReceive);
+    now.setDeliveryHandler(onDelivery);
+
+    espnow::Protocol::send(server_address, rs::formatted<sizeof(game::ClientMessage)>(
         "User %s",
         rs::toArrayString(espnow::Protocol::instance().mac).data()
     ));
@@ -52,9 +148,9 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
         String input = Serial.readStringUntil('\n');
         if (sscanf(input.c_str(), "%d %d", &x, &y) != 2) { continue; }
 
-        client.send(game::core::ClientMove{
-            .x = rs::u8(x),
-            .y = rs::u8(y)
+        espnow::Protocol::send(server_address, game::ClientMove{
+            .x = static_cast<rs::u8>(x),
+            .y = static_cast<rs::u8>(y)
         });
     }
 }

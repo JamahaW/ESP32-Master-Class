@@ -1,56 +1,56 @@
 #pragma once
 
-#include "serialcmd/StreamSerializer.hpp"
+#include <functional>
+#include <vector>
+
+#include "serialcmd/Serializer.hpp"
+
+#include "rs/primitives.hpp"
 
 
 namespace serialcmd {
+/// Протокол P2P общения
+template<
+    typename LocalInstructionCode, ///< Тип кода отправляемой инструкции
+    typename RemoteInstructionCode ///< Тип кода принимаемой инструкции
+> struct Protocol {
 
-    /// Протокол общения с мастер-устройством
-    template<
-        /// Тип индекса команды
-        typename CommandIndex,
-        /// Startup пакет данных
-        typename Startup
-    >
-    class Protocol {
-    public:
-        /// Функция обработки команды
-        typedef void(*CommandFunc)(StreamSerializer &);
+public:
 
-    private:
+    using onReceiceFunction = std::function<void(Serializer &)>;
 
-        /// Таблица команд
-        CommandFunc *commands;
+private:
 
-        /// Кол-во команд
-        const CommandIndex command_count;
+    /// Сериализатор
+    Serializer serializer;
+    /// Обработчики приёма данных
+    std::vector<onReceiceFunction> receive_handlers{};
 
-        StreamSerializer serializer;
+public:
 
-    public:
+    explicit Protocol(Stream &stream) :
+        serializer{stream} {}
 
-        explicit Protocol(
-            CommandFunc *commands,
-            const CommandIndex command_count,
-            Stream &stream
-        ) :
-            commands(commands), command_count(command_count), serializer(stream) {}
+    void addReceiver(onReceiceFunction &&handler) {
+        receive_handlers.push_back(std::move(handler));
+    }
 
-        /// Отправить начальный пакет
-        void begin(Startup &&startup) {
-            serializer.write(startup);
-        }
+    /// Обновление
+    void pull() {
+        if (serializer.stream.available() < sizeof(RemoteInstructionCode)) { return; }
 
-        /// Обновление
-        void pull() {
-            if (serializer.stream.available() < int(sizeof(CommandIndex))) { return; }
+        RemoteInstructionCode code;
+        serializer.read(code);
 
-            CommandIndex cmd_index;
-            serializer.read(cmd_index);
+        if (code >= receive_handlers.size()) { return; }
 
-            if (cmd_index >= command_count) { return; }
+        receive_handlers[code](serializer);
+    }
 
-            commands[cmd_index](serializer);
-        }
-    };
+public:
+
+    Protocol() = delete;
+
+};
+
 }

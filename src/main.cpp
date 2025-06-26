@@ -1,8 +1,12 @@
-#include "game/impl/node/Client.hpp"
-#include "game/impl/node/Host.hpp"
-#include "game/core/Protocol.hpp"
+#include "espnow/Mac.hpp"
 
-#include <Arduino.h>
+#include "serialcmd/Serializer.hpp"
+#include "serialcmd/Protocol.hpp"
+
+#include "game/impl/node/Host.hpp"
+#include "game/impl/node/Client.hpp"
+
+#include "Arduino.h"
 #include "WiFi.h"
 
 
@@ -11,22 +15,18 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
 /// Запуск сервера
 [[noreturn]] void runServer() {
-    game::core::Environment environment = {
-        .win_length = 14,
-        .field_size = {16, 16},
-        .field_state = {},
-        .move_timeout = 5000,
-    };
 
-    serialcmd::StreamSerializer serializer(Serial);
+    /// Протокол связи между компьютером и игровой средой
+    auto game_protocol = serialcmd::Protocol<rs::u8, rs::u8>{Serial};
 
-    game::impl::node::Host host(environment, serializer);
+    /// узел сети ESP NOW для связи с клиентами
+    auto game_host = game::impl::node::Host{};
 
-    host.init();
-    host.sendMac();
+    game_host.init();
 
     while (true) {
-        host.pull();
+        delay(10);
+
     }
 }
 

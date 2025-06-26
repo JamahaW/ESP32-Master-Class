@@ -133,6 +133,8 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
     now.setReceiveHandler(onReceive);
     now.setDeliveryHandler(onDelivery);
 
+    espnow::Peer::add(server_address);
+
     espnow::Protocol::send(server_address, rs::formatted<sizeof(game::ClientMessage)>(
         "User %s",
         rs::toArrayString(espnow::Protocol::instance().mac).data()
@@ -148,10 +150,12 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
         String input = Serial.readStringUntil('\n');
         if (sscanf(input.c_str(), "%d %d", &x, &y) != 2) { continue; }
 
-        espnow::Protocol::send(server_address, game::ClientMove{
+        auto result = espnow::Protocol::send(server_address, game::ClientMove{
             .x = static_cast<rs::u8>(x),
             .y = static_cast<rs::u8>(y)
         });
+
+        Serial.printf("Send: %s\n", rs::toString(result.value));
     }
 }
 

@@ -3,7 +3,7 @@
 #include "serialcmd/Serializer.hpp"
 #include "serialcmd/Protocol.hpp"
 
-#include "game/impl/node/Host.hpp"
+#include "game/impl/node/Bridge.hpp"
 #include "game/impl/node/Client.hpp"
 
 #include "Arduino.h"
@@ -20,7 +20,7 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
     auto game_protocol = serialcmd::Protocol<rs::u8, rs::u8>{Serial};
 
     /// узел сети ESP NOW для связи с клиентами
-    auto game_host = game::impl::node::Host{};
+    auto game_host = game::impl::node::Bridge{};
 
     game_host.init();
 

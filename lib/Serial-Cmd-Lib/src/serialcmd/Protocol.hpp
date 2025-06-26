@@ -19,12 +19,38 @@ public:
 
     using onReceiceFunction = std::function<void(Serializer &)>;
 
+    /// Инструкция
+    struct Instruction {
+
+    private:
+
+        /// Код инструкции
+        const LocalInstructionCode code;
+        /// Сериализатор
+        Serializer &ser;
+
+    public:
+
+        Instruction(LocalInstructionCode code, Serializer &s) :
+            code{code}, ser{s} {}
+
+        /// Отправить инструкцию
+        template<typename T> void send(T &&value) {
+            ser.write(code);
+            ser.write(value);
+        }
+
+        Instruction() = delete;
+    };
+
 private:
 
     /// Сериализатор
     Serializer serializer;
     /// Обработчики приёма данных
     std::vector<onReceiceFunction> receive_handlers{};
+    /// Обработчики отправки данных
+    LocalInstructionCode senders{0};
 
 public:
 
@@ -33,6 +59,12 @@ public:
 
     void addReceiver(onReceiceFunction &&handler) {
         receive_handlers.push_back(std::move(handler));
+    }
+
+    const Instruction &addSender() {
+        auto instruction = Instruction(LocalInstructionCode(senders), serializer);
+        senders += 1;
+        return instruction;
     }
 
     /// Обновление

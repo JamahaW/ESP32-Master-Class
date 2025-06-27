@@ -59,7 +59,7 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
             auto &s = bridge.send_log.begin();
             s.write(rs::formatted<sizeof(game::HostLogMessage)>(
-                "peer %s add : %s",
+                "peer %s add -> %s",
                 rs::toArrayString(mac).data(),
                 rs::toString(result.value)
             ));
@@ -69,7 +69,7 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 
         auto &s = bridge.send_log.begin();
         s.write(rs::formatted<sizeof(game::HostLogMessage)>(
-            "send to %s : status: %s",
+            "sending to %s -> %s",
             rs::toArrayString(mac).data(),
             rs::toString(result.value)
         ));

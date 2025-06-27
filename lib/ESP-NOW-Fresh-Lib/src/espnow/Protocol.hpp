@@ -103,6 +103,7 @@ struct Protocol {
     enum class Send : rs::u8 {
         Ok = 0x00, ///< Сообщение успешно отправлено
         NotInit, ///< Протокол ESP-NOW не был инициализирован
+        TooBigMessage, ///< Слишком большое сообщение
         InvalidArg, ///< Неверный аргумент
         InternalError, ///< Внутренняя ошибка ESP-NOW API
         NoMemory, ///< Не хватает памяти для отправки сообщения
@@ -126,7 +127,7 @@ struct Protocol {
 
     /// Отправить сообщение (данные из буфера)
     static rs::Result<Send> send(const Mac &mac, const void *data, rs::u8 size) {
-        if (size > ESP_NOW_KEY_LEN) { return {Send::InvalidArg}; }
+        if (size > ESP_NOW_MAX_DATA_LEN) { return {Send::TooBigMessage}; }
 
         return {
             translateSend(esp_now_send(
@@ -258,6 +259,7 @@ static str toString(espnow::Protocol::Init value) {
 static str toString(espnow::Protocol::Send value) {
     switch (value) {
         return_case(espnow::Protocol::Send::Ok)
+        return_case(espnow::Protocol::Send::TooBigMessage)
         return_case(espnow::Protocol::Send::NotInit)
         return_case(espnow::Protocol::Send::InvalidArg)
         return_case(espnow::Protocol::Send::InternalError)

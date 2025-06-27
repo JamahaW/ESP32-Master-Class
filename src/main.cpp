@@ -51,7 +51,7 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
         rs::u8 size;
         serializer.read(size);
 
-        rs::u8 data[size];
+        static rs::u8 data[256];
         serializer.stream.readBytes(data, size);
 
         if (not espnow::Peer::exist(mac)) {

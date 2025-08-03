@@ -1,10 +1,9 @@
-#include "serialcmd/impl/protocol/GameProtocol.hpp"
-
 #include "Arduino.h"
+
 #include "WiFi.h"
-
-
 #include "espnow/Protocol.hpp"
+
+#include "serialcmd/impl/protocol/GameProtocol.hpp"
 #include "game/Packets.hpp"
 
 
@@ -92,7 +91,7 @@ constexpr espnow::Mac server_address = {0x78, 0x1C, 0x3C, 0xA4, 0x9E, 0x7C};
 }
 
 /// Запуск клиента пользователя
-[[noreturn]] void runClientUser() {
+[[noreturn]] void runClient() {
 
     auto onDelivery = [](const espnow::Mac &mac, espnow::Protocol::DeliveryStatus status) {
         Serial.printf(
@@ -173,7 +172,7 @@ void setup() {
     if (esp_now.mac == server_address) {
         runServer();
     } else {
-        runClientUser();
+        runClient();
     }
 }
 
